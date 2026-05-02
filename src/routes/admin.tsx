@@ -19,11 +19,11 @@ export const Route = createFileRoute("/admin")({
 });
 
 const nav = [
-  { to: "/admin", label: "Overview", icon: LayoutDashboard, exact: true },
-  { to: "/admin/projects", label: "Projects", icon: FolderKanban },
-  { to: "/admin/services", label: "Services", icon: Sparkles },
-  { to: "/admin/content", label: "Content", icon: FileText },
-  { to: "/admin/messages", label: "Messages", icon: Inbox },
+  { to: "/admin", label: "Overview", icon: LayoutDashboard, exact: true as boolean },
+  { to: "/admin/projects", label: "Projects", icon: FolderKanban, exact: false as boolean },
+  { to: "/admin/services", label: "Services", icon: Sparkles, exact: false as boolean },
+  { to: "/admin/content", label: "Content", icon: FileText, exact: false as boolean },
+  { to: "/admin/messages", label: "Messages", icon: Inbox, exact: false as boolean },
 ] as const;
 
 function AdminLayout() {
