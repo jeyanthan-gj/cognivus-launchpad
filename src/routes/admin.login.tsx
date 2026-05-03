@@ -23,7 +23,7 @@ type Status =
 function AdminLogin() {
   const navigate = useNavigate();
   const [username, setUsername] = useState(ADMIN_USERNAME);
-  const [password, setPassword] = useState("admin123");
+  const [password, setPassword] = useState("admin@123");
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<Status>({ state: "checking" });
 
