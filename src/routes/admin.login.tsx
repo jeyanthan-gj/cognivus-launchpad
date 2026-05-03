@@ -23,7 +23,7 @@ type Status =
 function AdminLogin() {
   const navigate = useNavigate();
   const [username, setUsername] = useState(ADMIN_USERNAME);
-  const [password, setPassword] = useState("admin123");
+  const [password, setPassword] = useState("admin@123");
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<Status>({ state: "checking" });
 
@@ -81,7 +81,7 @@ function AdminLogin() {
         <h1 className="mt-6 text-center text-2xl font-bold tracking-tight">Sign in</h1>
         <p className="mt-1 text-center text-sm text-muted-foreground">
           Default credentials: <code className="rounded bg-accent px-1">admin</code> /{" "}
-          <code className="rounded bg-accent px-1">admin123</code>
+          <code className="rounded bg-accent px-1">admin@123</code>
         </p>
 
         <div className="mt-5">
