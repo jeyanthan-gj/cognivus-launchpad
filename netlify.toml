@@ -1,17 +1,7 @@
 [build]
   command = "npm run build"
-  publish = ".output/public"
+  publish = "dist/client"
 
 [build.environment]
   NODE_VERSION  = "22"
   NPM_VERSION   = "10"
-  NITRO_PRESET  = "netlify"
-
-[functions]
-  directory    = ".output/server"
-  node_bundler = "esbuild"
-
-[[redirects]]
-  from   = "/*"
-  to     = "/.netlify/functions/server"
-  status = 200
