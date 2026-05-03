@@ -1,68 +1,49 @@
 import { createServerFn } from "@tanstack/react-start";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-
-const ADMIN_EMAIL = "admin@cognivus.local";
-const ADMIN_PASSWORD = "admin@123";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 /**
- * Ensures the default admin user exists with the admin role.
- * Idempotent: safe to call on every login page load.
+ * Checks whether at least one admin user exists in the system.
+ * Returns only a boolean — no emails, no credentials, no PII exposed.
+ *
+ * Admin provisioning is NOT done automatically here. Use the one-time
+ * CLI script (`scripts/provision-admin.ts`) or the Supabase dashboard
+ * to create the initial admin account.
  */
-export const ensureDefaultAdmin = createServerFn({ method: "POST" }).handler(async () => {
-  // Look up existing user by email
-  const { data: list, error: listErr } = await supabaseAdmin.auth.admin.listUsers();
-  if (listErr) throw listErr;
-
-  let user = list.users.find((u) => u.email?.toLowerCase() === ADMIN_EMAIL);
-
-  if (!user) {
-    const { data: created, error: createErr } = await supabaseAdmin.auth.admin.createUser({
-      email: ADMIN_EMAIL,
-      password: ADMIN_PASSWORD,
-      email_confirm: true,
-    });
-    if (createErr) throw createErr;
-    user = created.user!;
-  } else {
-    // Keep password in sync with the configured default.
-    await supabaseAdmin.auth.admin.updateUserById(user.id, { password: ADMIN_PASSWORD });
-  }
-
-  // Ensure admin role
-  const { data: existingRole } = await supabaseAdmin
+export const getAdminReady = createServerFn({ method: "GET" }).handler(async () => {
+  const { data: roles, error } = await supabaseAdmin
     .from("user_roles")
     .select("id")
-    .eq("user_id", user.id)
     .eq("role", "admin")
-    .maybeSingle();
+    .limit(1);
 
-  if (!existingRole) {
-    const { error: roleErr } = await supabaseAdmin
+  if (error) {
+    // Return false — don't leak internal error details to the client
+    return { ready: false };
+  }
+
+  return { ready: (roles?.length ?? 0) > 0 };
+});
+
+/**
+ * Clears the must_change_password flag for the currently authenticated admin user.
+ * Called by the Account page after a successful password update.
+ * Requires a valid Bearer token — uses the auth middleware.
+ */
+export const clearMustChangePassword = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { error } = await supabaseAdmin
       .from("user_roles")
-      .insert({ user_id: user.id, role: "admin" });
-    if (roleErr) throw roleErr;
-  }
+      .update({ must_change_password: false })
+      .eq("user_id", context.userId)
+      .eq("role", "admin");
 
-  return { ok: true, email: ADMIN_EMAIL, hasAdminRole: true };
-});
+    if (error) {
+      // Non-fatal — the user successfully changed their password; the flag
+      // will be cleared on next provisioning run if this fails.
+      console.error("[clearMustChangePassword] Failed:", error.message);
+    }
 
-/**
- * Public status check for the default admin account — used by the login page
- * to show a clear "ready" indicator.
- */
-export const getAdminStatus = createServerFn({ method: "GET" }).handler(async () => {
-  const { data: list, error: listErr } = await supabaseAdmin.auth.admin.listUsers();
-  if (listErr) return { exists: false, hasAdminRole: false, email: ADMIN_EMAIL };
-
-  const user = list.users.find((u) => u.email?.toLowerCase() === ADMIN_EMAIL);
-  if (!user) return { exists: false, hasAdminRole: false, email: ADMIN_EMAIL };
-
-  const { data: role } = await supabaseAdmin
-    .from("user_roles")
-    .select("id")
-    .eq("user_id", user.id)
-    .eq("role", "admin")
-    .maybeSingle();
-
-  return { exists: true, hasAdminRole: !!role, email: ADMIN_EMAIL };
-});
+    return { ok: true };
+  });

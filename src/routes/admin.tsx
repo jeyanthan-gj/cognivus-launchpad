@@ -8,6 +8,7 @@ import {
   Inbox,
   KeyRound,
   LogOut,
+  ShieldAlert,
 } from "lucide-react";
 import logoSrc from "@/assets/logo.png";
 import { useAdminAuth } from "@/hooks/useAdminAuth";
@@ -29,7 +30,7 @@ const nav = [
 ] as const;
 
 function AdminLayout() {
-  const { loading, user, isAdmin } = useAdminAuth();
+  const { loading, user, isAdmin, mustChangePassword } = useAdminAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -37,8 +38,13 @@ function AdminLayout() {
     if (loading) return;
     if (!user && location.pathname !== "/admin/login") {
       navigate({ to: "/admin/login" });
+      return;
     }
-  }, [loading, user, navigate, location.pathname]);
+    // Force password change before allowing access to any other admin page
+    if (user && isAdmin && mustChangePassword && location.pathname !== "/admin/account") {
+      navigate({ to: "/admin/account" });
+    }
+  }, [loading, user, isAdmin, mustChangePassword, navigate, location.pathname]);
 
   if (location.pathname === "/admin/login") {
     return <Outlet />;
@@ -151,6 +157,19 @@ function AdminLayout() {
             </Link>
           ))}
         </nav>
+
+        {/* Force-password-change banner */}
+        {mustChangePassword && (
+          <div className="flex items-center gap-3 border-b border-amber-500/30 bg-amber-500/10 px-6 py-3 text-sm text-amber-700 dark:text-amber-300">
+            <ShieldAlert className="h-4 w-4 shrink-0" />
+            <span>
+              You must change your password before continuing.{" "}
+              <Link to="/admin/account" className="font-medium underline underline-offset-2">
+                Change it now →
+              </Link>
+            </span>
+          </div>
+        )}
 
         <div className="mx-auto max-w-6xl p-6 md:p-10">
           <Outlet />

@@ -1,23 +1,48 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
-import { KeyRound } from "lucide-react";
+import { KeyRound, CheckCircle2, XCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { clearMustChangePassword } from "@/api_functions/admin.functions";
 
 export const Route = createFileRoute("/admin/account")({
   head: () => ({ meta: [{ title: "Account — Cognivus Admin" }] }),
   component: AdminAccount,
 });
 
+const MIN_LENGTH = 12;
+
+function checkStrength(pw: string) {
+  return {
+    length: pw.length >= MIN_LENGTH,
+    upper: /[A-Z]/.test(pw),
+    lower: /[a-z]/.test(pw),
+    digit: /\d/.test(pw),
+    special: /[^A-Za-z0-9]/.test(pw),
+  };
+}
+
+function Rule({ ok, label }: { ok: boolean; label: string }) {
+  return (
+    <li className={`flex items-center gap-1.5 text-xs ${ok ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"}`}>
+      {ok ? <CheckCircle2 className="h-3.5 w-3.5" /> : <XCircle className="h-3.5 w-3.5" />}
+      {label}
+    </li>
+  );
+}
+
 function AdminAccount() {
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [busy, setBusy] = useState(false);
 
+  const strength = checkStrength(password);
+  const allPass = Object.values(strength).every(Boolean);
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (password.length < 6) {
-      toast.error("Password must be at least 6 characters.");
+    if (!allPass) {
+      toast.error("Password does not meet all requirements.");
       return;
     }
     if (password !== confirm) {
@@ -26,6 +51,10 @@ function AdminAccount() {
     }
     setBusy(true);
     const { error } = await supabase.auth.updateUser({ password });
+    if (!error) {
+      // Clear the forced-change flag — fire and forget, non-blocking
+      void clearMustChangePassword().catch(() => {});
+    }
     setBusy(false);
     if (error) {
       toast.error(error.message);
@@ -48,34 +77,48 @@ function AdminAccount() {
         </div>
       </div>
 
-      <form onSubmit={submit} className="space-y-4 rounded-2xl border border-border bg-card p-6 shadow-soft">
+      <form onSubmit={submit} className="space-y-4 rounded-2xl border border-border bg-card p-6 shadow-soft" autoComplete="off">
         <div>
           <label htmlFor="new-password" className="text-sm font-medium">New password</label>
           <input
             id="new-password"
             type="password"
+            name="new-password"
             required
-            minLength={6}
+            autoComplete="new-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             className="mt-1.5 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
           />
+          {password.length > 0 && (
+            <ul className="mt-2 space-y-1">
+              <Rule ok={strength.length} label={`At least ${MIN_LENGTH} characters`} />
+              <Rule ok={strength.upper} label="Uppercase letter" />
+              <Rule ok={strength.lower} label="Lowercase letter" />
+              <Rule ok={strength.digit} label="Number" />
+              <Rule ok={strength.special} label="Special character (!@#$…)" />
+            </ul>
+          )}
         </div>
         <div>
           <label htmlFor="confirm-password" className="text-sm font-medium">Confirm password</label>
           <input
             id="confirm-password"
             type="password"
+            name="confirm-password"
             required
-            minLength={6}
+            autoComplete="new-password"
             value={confirm}
             onChange={(e) => setConfirm(e.target.value)}
             className="mt-1.5 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
           />
+          {confirm.length > 0 && password !== confirm && (
+            <p className="mt-1 text-xs text-destructive">Passwords do not match.</p>
+          )}
         </div>
         <button
           type="submit"
-          disabled={busy}
+          disabled={busy || !allPass || password !== confirm}
           className="rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground shadow-soft hover:shadow-elegant disabled:opacity-60"
         >
           {busy ? "Updating…" : "Update password"}

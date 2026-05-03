@@ -1,72 +1,136 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
-import { CheckCircle2, AlertTriangle, Loader2 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { CheckCircle2, AlertTriangle, Loader2, ShieldAlert } from "lucide-react";
 import logoSrc from "@/assets/logo.png";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { ensureDefaultAdmin, getAdminStatus } from "@/api_functions/admin.functions";
+import { getAdminReady } from "@/api_functions/admin.functions";
 
 export const Route = createFileRoute("/admin/login")({
   head: () => ({ meta: [{ title: "Admin Login — Cognivus" }] }),
   component: AdminLogin,
 });
 
-const ADMIN_USERNAME = "admin";
-const ADMIN_EMAIL = "admin@cognivus.local";
+// Client-side rate limiting: max 5 attempts per 15-minute window
+const MAX_ATTEMPTS = 5;
+const LOCKOUT_MS = 15 * 60 * 1000;
 
-type Status =
-  | { state: "checking" }
-  | { state: "ready"; email: string }
-  | { state: "missing-role"; email: string }
-  | { state: "missing-user"; email: string }
-  | { state: "error"; message: string };
+function getRateLimit() {
+  try {
+    const raw = sessionStorage.getItem("__al");
+    if (!raw) return { attempts: 0, lockedUntil: 0 };
+    return JSON.parse(raw) as { attempts: number; lockedUntil: number };
+  } catch {
+    return { attempts: 0, lockedUntil: 0 };
+  }
+}
+
+function setRateLimit(attempts: number, lockedUntil: number) {
+  try {
+    sessionStorage.setItem("__al", JSON.stringify({ attempts, lockedUntil }));
+  } catch {
+    // sessionStorage unavailable — fail open (server-side Supabase rate limits still apply)
+  }
+}
+
+type Status = { state: "checking" } | { state: "ready" } | { state: "no-admin" } | { state: "error" };
 
 function AdminLogin() {
   const navigate = useNavigate();
-  const [username, setUsername] = useState(ADMIN_USERNAME);
-  const [password, setPassword] = useState("admin@123");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<Status>({ state: "checking" });
+  const [lockedUntil, setLockedUntil] = useState(0);
+  const [secondsLeft, setSecondsLeft] = useState(0);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // Redirect already-authenticated users immediately
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        // Provision (idempotent), then read back the live status.
-        await ensureDefaultAdmin().catch(() => {});
-        const s = await getAdminStatus();
-        if (cancelled) return;
-        if (!s.exists) setStatus({ state: "missing-user", email: s.email });
-        else if (!s.hasAdminRole) setStatus({ state: "missing-role", email: s.email });
-        else setStatus({ state: "ready", email: s.email });
-      } catch (e) {
-        if (!cancelled) setStatus({ state: "error", message: (e as Error).message });
-      }
-    })();
-
     void supabase.auth.getSession().then(({ data }) => {
       if (data.session) navigate({ to: "/admin" });
     });
-
-    return () => {
-      cancelled = true;
-    };
   }, [navigate]);
 
+  // Check if at least one admin exists — no credentials exposed
+  useEffect(() => {
+    let cancelled = false;
+    void getAdminReady()
+      .then((r) => {
+        if (!cancelled) setStatus(r.ready ? { state: "ready" } : { state: "no-admin" });
+      })
+      .catch(() => {
+        if (!cancelled) setStatus({ state: "error" });
+      });
+    return () => { cancelled = true; };
+  }, []);
+
+  // Restore lockout state from sessionStorage on mount
+  useEffect(() => {
+    const { lockedUntil: lu } = getRateLimit();
+    if (lu > Date.now()) startLockoutTimer(lu);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function startLockoutTimer(until: number) {
+    setLockedUntil(until);
+    if (timerRef.current) clearInterval(timerRef.current);
+    timerRef.current = setInterval(() => {
+      const remaining = Math.ceil((until - Date.now()) / 1000);
+      if (remaining <= 0) {
+        setLockedUntil(0);
+        setSecondsLeft(0);
+        clearInterval(timerRef.current!);
+      } else {
+        setSecondsLeft(remaining);
+      }
+    }, 1000);
+  }
+
+  useEffect(() => () => { if (timerRef.current) clearInterval(timerRef.current); }, []);
+
+  const isLocked = lockedUntil > Date.now();
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setBusy(true);
+    if (isLocked) return;
 
-    // Map the "admin" username to the underlying email.
-    const email = username.trim().toLowerCase() === ADMIN_USERNAME ? ADMIN_EMAIL : username.trim();
-
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    setBusy(false);
-    if (error) {
-      toast.error(error.message);
+    const rl = getRateLimit();
+    if (rl.lockedUntil > Date.now()) {
+      startLockoutTimer(rl.lockedUntil);
       return;
     }
+
+    // Basic email format guard before hitting the server
+    if (!email.trim().includes("@")) {
+      toast.error("Enter a valid email address.");
+      return;
+    }
+
+    setBusy(true);
+    const { error } = await supabase.auth.signInWithPassword({
+      email: email.trim().toLowerCase(),
+      password,
+    });
+    setBusy(false);
+
+    if (error) {
+      // Increment attempt counter
+      const newAttempts = rl.attempts + 1;
+      if (newAttempts >= MAX_ATTEMPTS) {
+        const until = Date.now() + LOCKOUT_MS;
+        setRateLimit(newAttempts, until);
+        startLockoutTimer(until);
+        toast.error("Too many failed attempts. Locked for 15 minutes.");
+      } else {
+        setRateLimit(newAttempts, 0);
+        // Use a generic message — never expose whether email exists
+        toast.error(`Invalid credentials. ${MAX_ATTEMPTS - newAttempts} attempt(s) remaining.`);
+      }
+      return;
+    }
+
+    // Success — clear the counter
+    setRateLimit(0, 0);
     navigate({ to: "/admin" });
   };
 
@@ -78,52 +142,54 @@ function AdminLogin() {
           Cognivus Admin
         </Link>
         <h1 className="mt-6 text-center text-2xl font-bold tracking-tight">Sign in</h1>
-        <p className="mt-1 text-center text-sm text-muted-foreground">
-          Default credentials: <code className="rounded bg-accent px-1">admin</code> /{" "}
-          <code className="rounded bg-accent px-1">admin@123</code>
-        </p>
 
+        {/* System status indicator — no credential info exposed */}
         <div className="mt-5">
           {status.state === "checking" && (
             <div className="flex items-center gap-2 rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              Checking admin account…
+              Verifying system status…
             </div>
           )}
           {status.state === "ready" && (
             <div className="flex items-center gap-2 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-700 dark:text-emerald-300">
               <CheckCircle2 className="h-3.5 w-3.5" />
-              Admin access verified — <span className="font-mono">{status.email}</span> has the admin role.
+              System ready.
             </div>
           )}
-          {(status.state === "missing-role" || status.state === "missing-user") && (
+          {status.state === "no-admin" && (
             <div className="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
               <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-              <span>
-                {status.state === "missing-user"
-                  ? `Admin account ${status.email} is not provisioned yet. Refresh the page to retry.`
-                  : `Account ${status.email} exists but is missing the admin role.`}
-              </span>
+              No admin account found. Run the provisioning script to create one.
             </div>
           )}
           {status.state === "error" && (
             <div className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
               <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-              <span>Status check failed: {status.message}</span>
+              Unable to reach the server. Check your connection.
+            </div>
+          )}
+          {isLocked && (
+            <div className="mt-2 flex items-center gap-2 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+              <ShieldAlert className="h-3.5 w-3.5 shrink-0" />
+              Too many attempts — locked for {Math.floor(secondsLeft / 60)}m {secondsLeft % 60}s.
             </div>
           )}
         </div>
 
-        <form onSubmit={submit} className="mt-6 space-y-4">
+        <form onSubmit={submit} className="mt-6 space-y-4" autoComplete="on">
           <div>
-            <label htmlFor="username" className="text-sm font-medium">Username</label>
+            <label htmlFor="email" className="text-sm font-medium">Email</label>
             <input
-              id="username"
-              type="text"
+              id="email"
+              type="email"
+              name="email"
               required
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              className="mt-1.5 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              autoComplete="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              disabled={isLocked || busy}
+              className="mt-1.5 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
             />
           </div>
           <div>
@@ -131,25 +197,24 @@ function AdminLogin() {
             <input
               id="password"
               type="password"
+              name="password"
               required
-              minLength={6}
+              autoComplete="current-password"
+              minLength={8}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="mt-1.5 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              disabled={isLocked || busy}
+              className="mt-1.5 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
             />
           </div>
           <button
             type="submit"
-            disabled={busy}
+            disabled={busy || isLocked || status.state === "checking"}
             className="w-full rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground shadow-soft hover:shadow-elegant disabled:opacity-60"
           >
             {busy ? "Signing in…" : "Sign in"}
           </button>
         </form>
-
-        <p className="mt-4 text-center text-xs text-muted-foreground">
-          You can change the password from the dashboard after signing in.
-        </p>
 
         <Link to="/" className="mt-6 block text-center text-xs text-muted-foreground hover:text-foreground">
           ← Back to website
