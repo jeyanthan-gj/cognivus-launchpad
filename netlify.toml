@@ -3,7 +3,7 @@
   publish = ".output/public"
 
 [build.environment]
-  NODE_VERSION  = "20"
+  NODE_VERSION  = "22"
   NPM_VERSION   = "10"
   NITRO_PRESET  = "netlify"
 
