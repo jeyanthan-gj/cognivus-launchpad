@@ -40,5 +40,26 @@ export const ensureDefaultAdmin = createServerFn({ method: "POST" }).handler(asy
     if (roleErr) throw roleErr;
   }
 
-  return { ok: true, email: ADMIN_EMAIL };
+  return { ok: true, email: ADMIN_EMAIL, hasAdminRole: true };
+});
+
+/**
+ * Public status check for the default admin account — used by the login page
+ * to show a clear "ready" indicator.
+ */
+export const getAdminStatus = createServerFn({ method: "GET" }).handler(async () => {
+  const { data: list, error: listErr } = await supabaseAdmin.auth.admin.listUsers();
+  if (listErr) return { exists: false, hasAdminRole: false, email: ADMIN_EMAIL };
+
+  const user = list.users.find((u) => u.email?.toLowerCase() === ADMIN_EMAIL);
+  if (!user) return { exists: false, hasAdminRole: false, email: ADMIN_EMAIL };
+
+  const { data: role } = await supabaseAdmin
+    .from("user_roles")
+    .select("id")
+    .eq("user_id", user.id)
+    .eq("role", "admin")
+    .maybeSingle();
+
+  return { exists: true, hasAdminRole: !!role, email: ADMIN_EMAIL };
 });
