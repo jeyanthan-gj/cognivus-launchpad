@@ -1,11 +1,33 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# cognivus-launchpad — netlify.toml
+# ─────────────────────────────────────────────────────────────────────────────
+
 [build]
-  command = "NITRO_PRESET=netlify npm run build"
-  publish = ".output/public"
+  command   = "npm run build"
+  publish   = ".output/public"
+
+[build.environment]
+  NODE_VERSION    = "20"
+  NPM_VERSION     = "10"
+  NITRO_PRESET    = "netlify"
 
 [functions]
-  directory = ".output/server"
+  directory        = ".output/server"
+  node_bundler     = "esbuild"
 
+# SPA / SSR catch-all — all requests go through the Nitro server function
 [[redirects]]
-  from = "/*"
-  to = "/.netlify/functions/server"
+  from   = "/*"
+  to     = "/.netlify/functions/server"
   status = 200
+
+# ── Branch / context overrides ────────────────────────────────────────────────
+# Production inherits the defaults above.
+# Staging (any branch named "staging") gets its own env vars set in the
+# Netlify UI under Site → Environment Variables → Scopes → staging.
+
+[context.deploy-preview]
+  command = "npm run build"
+
+[context.branch-deploy]
+  command = "npm run build"
