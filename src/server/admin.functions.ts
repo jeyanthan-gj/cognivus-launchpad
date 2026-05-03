@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
 const ADMIN_EMAIL = "admin@cognivus.local";
-const ADMIN_PASSWORD = "admin123";
+const ADMIN_PASSWORD = "admin@123";
 
 /**
  * Ensures the default admin user exists with the admin role.
