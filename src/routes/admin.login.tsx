@@ -1,9 +1,10 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { BrainCircuit, CheckCircle2, AlertTriangle, Loader2 } from "lucide-react";
+import { CheckCircle2, AlertTriangle, Loader2 } from "lucide-react";
+import logoSrc from "@/assets/logo.png";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { ensureDefaultAdmin, getAdminStatus } from "@/server/admin.functions";
+import { ensureDefaultAdmin, getAdminStatus } from "@/api_functions/admin.functions";
 
 export const Route = createFileRoute("/admin/login")({
   head: () => ({ meta: [{ title: "Admin Login — Cognivus" }] }),
@@ -73,9 +74,7 @@ function AdminLogin() {
     <div className="flex min-h-screen items-center justify-center bg-hero px-4">
       <div className="w-full max-w-md rounded-2xl border border-border bg-card p-8 shadow-elegant">
         <Link to="/" className="flex items-center justify-center gap-2 font-semibold">
-          <span className="flex h-8 w-8 items-center justify-center rounded-md bg-gradient-primary text-primary-foreground shadow-soft">
-            <BrainCircuit className="h-4 w-4" />
-          </span>
+          <img src={logoSrc} alt="Cognivus" className="h-8 w-auto rounded-md" />
           Cognivus Admin
         </Link>
         <h1 className="mt-6 text-center text-2xl font-bold tracking-tight">Sign in</h1>

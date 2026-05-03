@@ -1,6 +1,8 @@
+import logoPart1 from "@/assets/logo-part1.jpg";
+import logoPart2 from "@/assets/logo-part2.jpg";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
-import { Menu, X, BrainCircuit } from "lucide-react";
+import { Menu, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const links = [
@@ -17,11 +19,9 @@ export function Header() {
   return (
     <header className="sticky top-0 z-40 w-full border-b border-border/60 bg-background/80 backdrop-blur-md">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
-        <Link to="/" className="flex items-center gap-2 font-semibold tracking-tight">
-          <span className="flex h-8 w-8 items-center justify-center rounded-md bg-gradient-primary text-primary-foreground shadow-soft">
-            <BrainCircuit className="h-4 w-4" />
-          </span>
-          <span className="text-lg">Cognivus</span>
+        <Link to="/" className="flex items-center gap-2 transition-opacity hover:opacity-90">
+          <img src={logoPart2} alt="Cognivus Icon" className="h-10 w-auto rounded-xl object-contain mix-blend-multiply dark:mix-blend-normal" />
+          <img src={logoPart1} alt="Cognivus - The mind behind every solution" className="h-11 w-auto object-contain mix-blend-multiply dark:mix-blend-normal mt-1" />
         </Link>
 
         <nav className="hidden items-center gap-1 md:flex">

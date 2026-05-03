@@ -8,8 +8,8 @@ import {
   Inbox,
   KeyRound,
   LogOut,
-  BrainCircuit,
 } from "lucide-react";
+import logoSrc from "@/assets/logo.png";
 import { useAdminAuth } from "@/hooks/useAdminAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
@@ -84,9 +84,7 @@ function AdminLayout() {
     <div className="flex min-h-screen bg-muted/30">
       <aside className="hidden w-64 shrink-0 flex-col border-r border-border bg-background p-4 md:flex">
         <Link to="/admin" className="mb-6 flex items-center gap-2 px-2 font-semibold">
-          <span className="flex h-8 w-8 items-center justify-center rounded-md bg-gradient-primary text-primary-foreground shadow-soft">
-            <BrainCircuit className="h-4 w-4" />
-          </span>
+          <img src={logoSrc} alt="Cognivus" className="h-8 w-auto rounded-md" />
           Cognivus
         </Link>
         <nav className="flex-1 space-y-1">
@@ -126,7 +124,7 @@ function AdminLayout() {
         {/* Mobile top bar */}
         <header className="flex items-center justify-between border-b border-border bg-background px-4 py-3 md:hidden">
           <Link to="/admin" className="flex items-center gap-2 font-semibold">
-            <BrainCircuit className="h-5 w-5" /> Admin
+            <img src={logoSrc} alt="Cognivus" className="h-5 w-auto rounded-md" /> Admin
           </Link>
           <button
             onClick={async () => {

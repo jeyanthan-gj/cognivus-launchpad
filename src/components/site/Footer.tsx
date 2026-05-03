@@ -1,16 +1,15 @@
 import { Link } from "@tanstack/react-router";
-import { BrainCircuit } from "lucide-react";
+import logoPart1 from "@/assets/logo-part1.jpg";
+import logoPart2 from "@/assets/logo-part2.jpg";
 
 export function Footer() {
   return (
     <footer className="border-t border-border/60 bg-background">
       <div className="mx-auto grid max-w-6xl gap-10 px-6 py-12 md:grid-cols-3">
         <div>
-          <Link to="/" className="flex items-center gap-2 font-semibold">
-            <span className="flex h-8 w-8 items-center justify-center rounded-md bg-gradient-primary text-primary-foreground shadow-soft">
-              <BrainCircuit className="h-4 w-4" />
-            </span>
-            <span>Cognivus</span>
+          <Link to="/" className="flex items-center gap-2 transition-opacity hover:opacity-90">
+            <img src={logoPart2} alt="Cognivus Icon" className="h-10 w-auto rounded-xl object-contain mix-blend-multiply dark:mix-blend-normal" />
+            <img src={logoPart1} alt="Cognivus - The mind behind every solution" className="h-11 w-auto object-contain mix-blend-multiply dark:mix-blend-normal mt-1" />
           </Link>
           <p className="mt-3 max-w-xs text-sm text-muted-foreground">
             The mind behind every solution. AI-powered systems engineered for real-world business impact.
