@@ -23,6 +23,9 @@ export const ensureDefaultAdmin = createServerFn({ method: "POST" }).handler(asy
     });
     if (createErr) throw createErr;
     user = created.user!;
+  } else {
+    // Keep password in sync with the configured default.
+    await supabaseAdmin.auth.admin.updateUserById(user.id, { password: ADMIN_PASSWORD });
   }
 
   // Ensure admin role
