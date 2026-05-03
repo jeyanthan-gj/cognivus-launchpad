@@ -81,7 +81,7 @@ function AdminLogin() {
         <h1 className="mt-6 text-center text-2xl font-bold tracking-tight">Sign in</h1>
         <p className="mt-1 text-center text-sm text-muted-foreground">
           Default credentials: <code className="rounded bg-accent px-1">admin</code> /{" "}
-          <code className="rounded bg-accent px-1">admin123</code>
+          <code className="rounded bg-accent px-1">admin@123</code>
         </p>
 
         <div className="mt-5">
