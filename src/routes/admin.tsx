@@ -6,6 +6,7 @@ import {
   Sparkles,
   FileText,
   Inbox,
+  KeyRound,
   LogOut,
   BrainCircuit,
 } from "lucide-react";
