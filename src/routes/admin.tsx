@@ -6,6 +6,7 @@ import {
   Sparkles,
   FileText,
   Inbox,
+  KeyRound,
   LogOut,
   BrainCircuit,
 } from "lucide-react";
@@ -24,6 +25,7 @@ const nav = [
   { to: "/admin/services", label: "Services", icon: Sparkles, exact: false as boolean },
   { to: "/admin/content", label: "Content", icon: FileText, exact: false as boolean },
   { to: "/admin/messages", label: "Messages", icon: Inbox, exact: false as boolean },
+  { to: "/admin/account", label: "Account", icon: KeyRound, exact: false as boolean },
 ] as const;
 
 function AdminLayout() {

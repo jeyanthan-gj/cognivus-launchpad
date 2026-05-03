@@ -3,20 +3,28 @@ import { useEffect, useState } from "react";
 import { BrainCircuit } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { ensureDefaultAdmin } from "@/server/admin.functions";
 
 export const Route = createFileRoute("/admin/login")({
   head: () => ({ meta: [{ title: "Admin Login — Cognivus" }] }),
   component: AdminLogin,
 });
 
+const ADMIN_USERNAME = "admin";
+const ADMIN_EMAIL = "admin@cognivus.local";
+
 function AdminLogin() {
   const navigate = useNavigate();
-  const [mode, setMode] = useState<"login" | "signup">("login");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [username, setUsername] = useState(ADMIN_USERNAME);
+  const [password, setPassword] = useState("admin123");
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
+    // Provision the default admin account on first visit (idempotent).
+    void ensureDefaultAdmin().catch(() => {
+      /* non-fatal — user will see error on submit if it truly failed */
+    });
+
     void supabase.auth.getSession().then(({ data }) => {
       if (data.session) navigate({ to: "/admin" });
     });
@@ -25,28 +33,17 @@ function AdminLogin() {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setBusy(true);
-    if (mode === "login") {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-      setBusy(false);
-      if (error) {
-        toast.error(error.message);
-        return;
-      }
-      navigate({ to: "/admin" });
-    } else {
-      const { error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: { emailRedirectTo: `${window.location.origin}/admin` },
-      });
-      setBusy(false);
-      if (error) {
-        toast.error(error.message);
-        return;
-      }
-      toast.success("Account created. Ask an existing admin to grant you access, then sign in.");
-      setMode("login");
+
+    // Map the "admin" username to the underlying email.
+    const email = username.trim().toLowerCase() === ADMIN_USERNAME ? ADMIN_EMAIL : username.trim();
+
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    setBusy(false);
+    if (error) {
+      toast.error(error.message);
+      return;
     }
+    navigate({ to: "/admin" });
   };
 
   return (
@@ -58,22 +55,21 @@ function AdminLogin() {
           </span>
           Cognivus Admin
         </Link>
-        <h1 className="mt-6 text-center text-2xl font-bold tracking-tight">
-          {mode === "login" ? "Sign in" : "Create account"}
-        </h1>
+        <h1 className="mt-6 text-center text-2xl font-bold tracking-tight">Sign in</h1>
         <p className="mt-1 text-center text-sm text-muted-foreground">
-          {mode === "login" ? "Access the Cognivus dashboard." : "Create an account to request admin access."}
+          Default credentials: <code className="rounded bg-accent px-1">admin</code> /{" "}
+          <code className="rounded bg-accent px-1">admin123</code>
         </p>
 
         <form onSubmit={submit} className="mt-6 space-y-4">
           <div>
-            <label htmlFor="email" className="text-sm font-medium">Email</label>
+            <label htmlFor="username" className="text-sm font-medium">Username</label>
             <input
-              id="email"
-              type="email"
+              id="username"
+              type="text"
               required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
               className="mt-1.5 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
             />
           </div>
@@ -94,17 +90,13 @@ function AdminLogin() {
             disabled={busy}
             className="w-full rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground shadow-soft hover:shadow-elegant disabled:opacity-60"
           >
-            {busy ? "Please wait…" : mode === "login" ? "Sign in" : "Create account"}
+            {busy ? "Signing in…" : "Sign in"}
           </button>
         </form>
 
-        <button
-          type="button"
-          onClick={() => setMode((m) => (m === "login" ? "signup" : "login"))}
-          className="mt-4 w-full text-center text-sm text-muted-foreground hover:text-foreground"
-        >
-          {mode === "login" ? "Need an account? Sign up" : "Already have an account? Sign in"}
-        </button>
+        <p className="mt-4 text-center text-xs text-muted-foreground">
+          You can change the password from the dashboard after signing in.
+        </p>
 
         <Link to="/" className="mt-6 block text-center text-xs text-muted-foreground hover:text-foreground">
           ← Back to website
