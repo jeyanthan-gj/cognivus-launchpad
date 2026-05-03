@@ -1,9 +1,9 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { BrainCircuit } from "lucide-react";
+import { BrainCircuit, CheckCircle2, AlertTriangle, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { ensureDefaultAdmin } from "@/server/admin.functions";
+import { ensureDefaultAdmin, getAdminStatus } from "@/server/admin.functions";
 
 export const Route = createFileRoute("/admin/login")({
   head: () => ({ meta: [{ title: "Admin Login — Cognivus" }] }),
@@ -13,22 +13,45 @@ export const Route = createFileRoute("/admin/login")({
 const ADMIN_USERNAME = "admin";
 const ADMIN_EMAIL = "admin@cognivus.local";
 
+type Status =
+  | { state: "checking" }
+  | { state: "ready"; email: string }
+  | { state: "missing-role"; email: string }
+  | { state: "missing-user"; email: string }
+  | { state: "error"; message: string };
+
 function AdminLogin() {
   const navigate = useNavigate();
   const [username, setUsername] = useState(ADMIN_USERNAME);
   const [password, setPassword] = useState("admin123");
   const [busy, setBusy] = useState(false);
+  const [status, setStatus] = useState<Status>({ state: "checking" });
 
   useEffect(() => {
-    // Provision the default admin account on first visit (idempotent).
-    void ensureDefaultAdmin().catch(() => {
-      /* non-fatal — user will see error on submit if it truly failed */
-    });
+    let cancelled = false;
+    (async () => {
+      try {
+        // Provision (idempotent), then read back the live status.
+        await ensureDefaultAdmin().catch(() => {});
+        const s = await getAdminStatus();
+        if (cancelled) return;
+        if (!s.exists) setStatus({ state: "missing-user", email: s.email });
+        else if (!s.hasAdminRole) setStatus({ state: "missing-role", email: s.email });
+        else setStatus({ state: "ready", email: s.email });
+      } catch (e) {
+        if (!cancelled) setStatus({ state: "error", message: (e as Error).message });
+      }
+    })();
 
     void supabase.auth.getSession().then(({ data }) => {
       if (data.session) navigate({ to: "/admin" });
     });
+
+    return () => {
+      cancelled = true;
+    };
   }, [navigate]);
+
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
