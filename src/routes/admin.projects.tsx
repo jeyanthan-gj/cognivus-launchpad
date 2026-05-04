@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/alert-dialog";
 
 export const Route = createFileRoute("/admin/projects")({
+  head: () => ({ meta: [{ title: "Projects — Cognivus Admin" }] }),
   component: AdminProjects,
 });
 

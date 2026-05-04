@@ -4,6 +4,7 @@ import { FolderKanban, Sparkles, Inbox, ArrowRight } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/admin/")({
+  head: () => ({ meta: [{ title: "Dashboard — Cognivus Admin" }] }),
   component: AdminOverview,
 });
 
