@@ -4,7 +4,7 @@ import { CheckCircle2, AlertTriangle, Loader2, ShieldAlert } from "lucide-react"
 import logoSrc from "@/assets/logo.png";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { getAdminReady } from "@/api_functions/admin.functions";
+import { getAdminReady, checkLoginRateLimit, recordFailedLogin } from "@/api_functions/admin.functions";
 
 export const Route = createFileRoute("/admin/login")({
   head: () => ({ meta: [{ title: "Admin Login — Cognivus" }] }),
@@ -107,6 +107,18 @@ function AdminLogin() {
     }
 
     setBusy(true);
+
+    // Server-side rate limit check — enforced independent of client state
+    const rateLimitResult = await checkLoginRateLimit({ data: { identifier: email } }).catch(() => null);
+    if (rateLimitResult && !rateLimitResult.allowed) {
+      const until = Date.now() + (rateLimitResult.retryAfterSeconds ?? LOCKOUT_MS / 1000) * 1000;
+      setRateLimit(MAX_ATTEMPTS, until);
+      startLockoutTimer(until);
+      toast.error("Too many failed attempts. Locked for 15 minutes.");
+      setBusy(false);
+      return;
+    }
+
     const { error } = await supabase.auth.signInWithPassword({
       email: email.trim().toLowerCase(),
       password,
@@ -114,7 +126,10 @@ function AdminLogin() {
     setBusy(false);
 
     if (error) {
-      // Increment attempt counter
+      // Record failed attempt server-side (hashed — no plaintext stored)
+      void recordFailedLogin({ data: { identifier: email } }).catch(() => {});
+
+      // Also increment client-side counter
       const newAttempts = rl.attempts + 1;
       if (newAttempts >= MAX_ATTEMPTS) {
         const until = Date.now() + LOCKOUT_MS;
