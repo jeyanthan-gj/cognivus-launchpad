@@ -4,6 +4,16 @@ import { Plus, Trash2, Pencil, X } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { ICON_OPTIONS, ServiceIcon } from "@/components/site/icon";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export const Route = createFileRoute("/admin/services")({
   component: AdminServices,
@@ -25,6 +35,7 @@ function AdminServices() {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(empty);
   const [busy, setBusy] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
 
   const load = async () => {
     const { data } = await supabase.from("services").select("*").order("display_order");
@@ -60,8 +71,8 @@ function AdminServices() {
   };
 
   const remove = async (id: string) => {
-    if (!confirm("Delete this service?")) return;
     const { error } = await supabase.from("services").delete().eq("id", id);
+    setDeleteTarget(null);
     if (error) { toast.error(error.message); return; }
     toast.success("Service deleted");
     void load();
@@ -97,7 +108,7 @@ function AdminServices() {
                 <button onClick={() => startEdit(s)} className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-accent">
                   <Pencil className="h-4 w-4" />
                 </button>
-                <button onClick={() => remove(s.id)} className="inline-flex h-8 w-8 items-center justify-center rounded-md text-destructive hover:bg-destructive/10">
+                <button onClick={() => setDeleteTarget(s.id)} className="inline-flex h-8 w-8 items-center justify-center rounded-md text-destructive hover:bg-destructive/10">
                   <Trash2 className="h-4 w-4" />
                 </button>
               </div>
@@ -107,12 +118,18 @@ function AdminServices() {
       </div>
 
       {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 p-4 backdrop-blur-sm">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 p-4 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="service-dialog-title"
+          onKeyDown={(e) => { if (e.key === "Escape") setOpen(false); }}
+        >
           <form onSubmit={save} className="relative w-full max-w-lg rounded-2xl border border-border bg-card p-6 shadow-elegant">
-            <button type="button" onClick={() => setOpen(false)} className="absolute right-3 top-3 rounded-md p-1 hover:bg-accent">
+            <button type="button" onClick={() => setOpen(false)} aria-label="Close dialog" className="absolute right-3 top-3 rounded-md p-1 hover:bg-accent">
               <X className="h-4 w-4" />
             </button>
-            <h2 className="text-xl font-semibold">{editing ? "Edit service" : "New service"}</h2>
+            <h2 id="service-dialog-title" className="text-xl font-semibold">{editing ? "Edit service" : "New service"}</h2>
             <div className="mt-5 space-y-4">
               <div>
                 <label className="text-sm font-medium">Icon</label>
@@ -146,6 +163,26 @@ function AdminServices() {
           </form>
         </div>
       )}
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete service?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently remove the service from the public site. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => deleteTarget && remove(deleteTarget)}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

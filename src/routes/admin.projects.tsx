@@ -164,12 +164,18 @@ function AdminProjects() {
       </div>
 
       {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 p-4 backdrop-blur-sm">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 p-4 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="project-dialog-title"
+          onKeyDown={(e) => { if (e.key === "Escape") setOpen(false); }}
+        >
           <form onSubmit={save} className="relative w-full max-w-2xl rounded-2xl border border-border bg-card p-6 shadow-elegant">
-            <button type="button" onClick={() => setOpen(false)} className="absolute right-3 top-3 rounded-md p-1 hover:bg-accent">
+            <button type="button" onClick={() => setOpen(false)} aria-label="Close dialog" className="absolute right-3 top-3 rounded-md p-1 hover:bg-accent">
               <X className="h-4 w-4" />
             </button>
-            <h2 className="text-xl font-semibold">{editing ? "Edit project" : "New project"}</h2>
+            <h2 id="project-dialog-title" className="text-xl font-semibold">{editing ? "Edit project" : "New project"}</h2>
             <div className="mt-5 grid gap-4 sm:grid-cols-2">
               <div className="sm:col-span-2">
                 <label className="text-sm font-medium">Title</label>
