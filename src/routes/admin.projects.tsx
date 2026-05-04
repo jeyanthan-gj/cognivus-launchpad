@@ -3,6 +3,16 @@ import { useEffect, useState } from "react";
 import { Plus, Trash2, Pencil, X } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export const Route = createFileRoute("/admin/projects")({
   component: AdminProjects,
@@ -33,6 +43,7 @@ function AdminProjects() {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(empty);
   const [busy, setBusy] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
 
   const load = async () => {
     const { data } = await supabase
@@ -88,8 +99,8 @@ function AdminProjects() {
   };
 
   const remove = async (id: string) => {
-    if (!confirm("Delete this project?")) return;
     const { error } = await supabase.from("projects").delete().eq("id", id);
+    setDeleteTarget(null);
     if (error) {
       toast.error(error.message);
       return;
@@ -139,7 +150,7 @@ function AdminProjects() {
                   <button onClick={() => startEdit(p)} className="mr-1 inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-accent">
                     <Pencil className="h-4 w-4" />
                   </button>
-                  <button onClick={() => remove(p.id)} className="inline-flex h-8 w-8 items-center justify-center rounded-md text-destructive hover:bg-destructive/10">
+                  <button onClick={() => setDeleteTarget(p.id)} className="inline-flex h-8 w-8 items-center justify-center rounded-md text-destructive hover:bg-destructive/10">
                     <Trash2 className="h-4 w-4" />
                   </button>
                 </td>
@@ -200,6 +211,26 @@ function AdminProjects() {
           </form>
         </div>
       )}
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete project?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. The project will be permanently removed from the site.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => deleteTarget && remove(deleteTarget)}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

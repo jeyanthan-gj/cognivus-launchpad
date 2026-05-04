@@ -3,6 +3,16 @@ import { useEffect, useState } from "react";
 import { Trash2, Mail } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export const Route = createFileRoute("/admin/messages")({
   component: AdminMessages,
@@ -19,6 +29,7 @@ type Message = {
 function AdminMessages() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
 
   const load = async () => {
     setLoading(true);
@@ -33,8 +44,8 @@ function AdminMessages() {
   useEffect(() => { void load(); }, []);
 
   const remove = async (id: string) => {
-    if (!confirm("Delete this message?")) return;
     const { error } = await supabase.from("contact_messages").delete().eq("id", id);
+    setDeleteTarget(null);
     if (error) { toast.error(error.message); return; }
     toast.success("Deleted");
     void load();
@@ -67,7 +78,7 @@ function AdminMessages() {
                   <span className="text-xs text-muted-foreground">
                     {new Date(m.created_at).toLocaleString()}
                   </span>
-                  <button onClick={() => remove(m.id)} className="inline-flex h-8 w-8 items-center justify-center rounded-md text-destructive hover:bg-destructive/10">
+                  <button onClick={() => setDeleteTarget(m.id)} className="inline-flex h-8 w-8 items-center justify-center rounded-md text-destructive hover:bg-destructive/10">
                     <Trash2 className="h-4 w-4" />
                   </button>
                 </div>
@@ -77,6 +88,26 @@ function AdminMessages() {
           ))}
         </ul>
       )}
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete message?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete the contact message. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => deleteTarget && remove(deleteTarget)}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
