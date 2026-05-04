@@ -49,6 +49,7 @@ function HomePage() {
       if (s.data) setServices(s.data as Service[]);
       if (p.data) setProjects(p.data as Project[]);
       if (c.data) setContent(Object.fromEntries(c.data.map((r) => [r.key, r.value])));
+      // Errors on the homepage are non-fatal — fallback content renders instead
     })();
   }, []);
 

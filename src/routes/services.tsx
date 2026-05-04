@@ -27,14 +27,18 @@ type Service = { id: string; icon: string; title: string; description: string };
 
 function ServicesPage() {
   const [services, setServices] = useState<Service[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     void (async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("services")
         .select("id,icon,title,description")
         .order("display_order");
-      if (data) setServices(data as Service[]);
+      if (error) setError(error.message);
+      else if (data) setServices(data as Service[]);
+      setLoading(false);
     })();
   }, []);
 
@@ -53,8 +57,19 @@ function ServicesPage() {
       </section>
 
       <section className="mx-auto max-w-6xl px-6 pb-24">
-        <div className="grid gap-6 md:grid-cols-2">
-          {services.map((s) => (
+        {loading ? (
+          <div className="grid gap-6 md:grid-cols-2">
+            {[0, 1, 2, 3].map((i) => (
+              <div key={i} className="h-48 rounded-xl border border-border bg-card animate-pulse" />
+            ))}
+          </div>
+        ) : error ? (
+          <div className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            Failed to load services. Please try refreshing.
+          </div>
+        ) : (
+          <div className="grid gap-6 md:grid-cols-2">
+            {services.map((s) => (
             <div
               key={s.id}
               className="group rounded-xl border border-border bg-card p-8 shadow-soft transition-all hover:-translate-y-0.5 hover:shadow-elegant"
@@ -66,7 +81,8 @@ function ServicesPage() {
               <p className="mt-3 text-pretty text-muted-foreground">{s.description}</p>
             </div>
           ))}
-        </div>
+          </div>
+        )}
       </section>
     </SiteLayout>
   );

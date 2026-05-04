@@ -17,11 +17,16 @@ function AdminContent() {
   const [values, setValues] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     void (async () => {
-      const { data } = await supabase.from("site_content").select("key,value");
-      if (data) setValues(Object.fromEntries(data.map((r) => [r.key, r.value])));
+      const { data, error } = await supabase.from("site_content").select("key,value");
+      if (error) {
+        setLoadError(error.message);
+      } else if (data) {
+        setValues(Object.fromEntries(data.map((r) => [r.key, r.value])));
+      }
       setLoading(false);
     })();
   }, []);
@@ -37,6 +42,14 @@ function AdminContent() {
   };
 
   if (loading) return <p className="text-sm text-muted-foreground">Loading…</p>;
+
+  if (loadError) {
+    return (
+      <div className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+        Failed to load content: {loadError}
+      </div>
+    );
+  }
 
   return (
     <div>

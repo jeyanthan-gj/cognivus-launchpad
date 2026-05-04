@@ -10,6 +10,7 @@ export const Route = createFileRoute("/admin/")({
 function AdminOverview() {
   const [counts, setCounts] = useState({ projects: 0, services: 0, messages: 0 });
   const [recent, setRecent] = useState<{ id: string; title: string; updated_at: string }[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     void (async () => {
@@ -19,6 +20,13 @@ function AdminOverview() {
         supabase.from("contact_messages").select("*", { count: "exact", head: true }),
         supabase.from("projects").select("id,title,updated_at").order("updated_at", { ascending: false }).limit(5),
       ]);
+
+      const firstError = p.error ?? s.error ?? m.error ?? r.error;
+      if (firstError) {
+        setError(firstError.message);
+        return;
+      }
+
       setCounts({
         projects: p.count ?? 0,
         services: s.count ?? 0,
@@ -38,6 +46,12 @@ function AdminOverview() {
     <div>
       <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
       <p className="mt-1 text-sm text-muted-foreground">Welcome back. Here's what's happening.</p>
+
+      {error && (
+        <div className="mt-4 rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          Failed to load dashboard data: {error}
+        </div>
+      )}
 
       <div className="mt-8 grid gap-4 sm:grid-cols-3">
         {stats.map((s) => {
