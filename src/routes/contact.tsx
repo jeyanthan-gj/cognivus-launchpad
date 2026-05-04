@@ -29,10 +29,28 @@ const schema = z.object({
 
 function ContactPage() {
   const [form, setForm] = useState({ name: "", email: "", message: "" });
+  // Honeypot: bots fill hidden fields; humans don't see them
+  const [honeypot, setHoneypot] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  // Simple timing check: humans take at least 3s to fill a form
+  const mountedAt = useState(() => Date.now())[0];
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Honeypot triggered — silently drop without feedback to the bot
+    if (honeypot) {
+      setForm({ name: "", email: "", message: "" });
+      toast.success("Message sent. We'll be in touch shortly.");
+      return;
+    }
+
+    // Too fast — likely automated
+    if (Date.now() - mountedAt < 3000) {
+      toast.error("Please take a moment to fill out the form.");
+      return;
+    }
+
     const parsed = schema.safeParse(form);
     if (!parsed.success) {
       toast.error(parsed.error.issues[0]?.message ?? "Invalid input");
@@ -68,6 +86,19 @@ function ContactPage() {
           onSubmit={onSubmit}
           className="rounded-2xl border border-border bg-card p-8 shadow-soft md:p-10"
         >
+          {/* Honeypot field — hidden from real users, bots fill it */}
+          <div aria-hidden="true" style={{ position: "absolute", left: "-9999px", opacity: 0, pointerEvents: "none" }}>
+            <label htmlFor="website">Website (leave blank)</label>
+            <input
+              id="website"
+              name="website"
+              type="text"
+              tabIndex={-1}
+              autoComplete="off"
+              value={honeypot}
+              onChange={(e) => setHoneypot(e.target.value)}
+            />
+          </div>
           <div className="grid gap-5 sm:grid-cols-2">
             <div className="sm:col-span-1">
               <label className="text-sm font-medium" htmlFor="name">Name</label>
