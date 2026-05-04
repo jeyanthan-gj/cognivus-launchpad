@@ -3,6 +3,10 @@
 .env.*
 !.env.example
 
+# Lockfile — use npm (package-lock.json is the canonical lockfile)
+bun.lockb
+bunfig.toml
+
 # Logs
 logs
 *.log
