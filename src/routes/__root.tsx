@@ -45,11 +45,11 @@ export const Route = createRootRoute({
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:title", content: "Cognivus — The mind behind every solution" },
-      { name: "description", content: "Cognivus Launchpad builds professional AI company websites with dynamic project and service management." },
-      { property: "og:description", content: "Cognivus Launchpad builds professional AI company websites with dynamic project and service management." },
-      { name: "twitter:description", content: "Cognivus Launchpad builds professional AI company websites with dynamic project and service management." },
-      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/dbc7ea1b-7799-429d-9e80-8fd9607dca45/id-preview-af7d5173--6458f10a-61d9-4606-bd72-6bc62ad3f1c0.lovable.app-1777777472224.png" },
-      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/dbc7ea1b-7799-429d-9e80-8fd9607dca45/id-preview-af7d5173--6458f10a-61d9-4606-bd72-6bc62ad3f1c0.lovable.app-1777777472224.png" },
+      {
+        name: "twitter:description",
+        content:
+          "AI automation, RAG knowledge assistants, custom chatbots, and workflow intelligence.",
+      },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
