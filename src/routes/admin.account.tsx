@@ -82,9 +82,8 @@ function AdminAccount() {
       // This prevents bypassing client-side policy checks via direct API calls.
       const result = await validateAndUpdatePassword({
         data: { password },
-        // Pass the Bearer token so the middleware can authenticate the request
         headers: { Authorization: `Bearer ${token}` },
-      } as Parameters<typeof validateAndUpdatePassword>[0]);
+      });
 
       if (!result.ok) {
         toast.error(result.error ?? "Password update failed.");
@@ -95,7 +94,7 @@ function AdminAccount() {
       // Clear the must_change_password flag (fire-and-forget; non-blocking)
       void clearMustChangePassword({
         headers: { Authorization: `Bearer ${token}` },
-      } as Parameters<typeof clearMustChangePassword>[0]).catch(() => {});
+      }).catch(() => {});
 
       toast.success("Password updated successfully.");
       setPassword("");

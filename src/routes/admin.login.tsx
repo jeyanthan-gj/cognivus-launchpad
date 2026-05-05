@@ -11,7 +11,8 @@ export const Route = createFileRoute("/admin/login")({
   component: AdminLogin,
 });
 
-// Client-side rate limiting: max 5 attempts per 15-minute window
+// ── Client-side rate limiting ─────────────────────────────────────────────────
+// This is a UX convenience only — the server enforces the same limits.
 const MAX_ATTEMPTS = 5;
 const LOCKOUT_MS = 15 * 60 * 1000;
 
@@ -29,7 +30,7 @@ function setRateLimit(attempts: number, lockedUntil: number) {
   try {
     sessionStorage.setItem("__al", JSON.stringify({ attempts, lockedUntil }));
   } catch {
-    // sessionStorage unavailable — fail open (server-side Supabase rate limits still apply)
+    // sessionStorage unavailable — server-side limits still apply
   }
 }
 
@@ -48,192 +49,199 @@ function AdminLogin() {
   // Redirect already-authenticated users immediately
   useEffect(() => {
     void supabase.auth.getSession().then(({ data }) => {
-      if (data.session) navigate({ to: "/admin" });
+      if (data.session) void navigate({ to: "/admin" });
     });
   }, [navigate]);
 
-  // Check if at least one admin exists — no credentials exposed
+  // Check whether any admin account exists
   useEffect(() => {
-    let cancelled = false;
     void getAdminReady()
-      .then((r) => {
-        if (!cancelled) setStatus(r.ready ? { state: "ready" } : { state: "no-admin" });
-      })
-      .catch(() => {
-        if (!cancelled) setStatus({ state: "error" });
-      });
-    return () => { cancelled = true; };
+      .then((res) => setStatus(res.ready ? { state: "ready" } : { state: "no-admin" }))
+      .catch(() => setStatus({ state: "error" }));
   }, []);
 
-  // Restore lockout state from sessionStorage on mount
+  // Restore client-side lockout from sessionStorage on mount
   useEffect(() => {
-    const { lockedUntil: lu } = getRateLimit();
-    if (lu > Date.now()) startLockoutTimer(lu);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    const { lockedUntil: saved } = getRateLimit();
+    if (saved > Date.now()) setLockedUntil(saved);
+  }, []);
 
-  function startLockoutTimer(until: number) {
-    setLockedUntil(until);
-    if (timerRef.current) clearInterval(timerRef.current);
-    timerRef.current = setInterval(() => {
-      const remaining = Math.ceil((until - Date.now()) / 1000);
+  // Countdown timer for lockout display
+  useEffect(() => {
+    if (lockedUntil <= 0) return;
+    const tick = () => {
+      const remaining = Math.ceil((lockedUntil - Date.now()) / 1000);
       if (remaining <= 0) {
         setLockedUntil(0);
         setSecondsLeft(0);
-        clearInterval(timerRef.current!);
+        if (timerRef.current) clearInterval(timerRef.current);
       } else {
         setSecondsLeft(remaining);
       }
-    }, 1000);
-  }
+    };
+    tick();
+    timerRef.current = setInterval(tick, 1000);
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+  }, [lockedUntil]);
 
-  useEffect(() => () => { if (timerRef.current) clearInterval(timerRef.current); }, []);
-
-  const isLocked = lockedUntil > Date.now();
-
-  const submit = async (e: React.FormEvent) => {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (isLocked) return;
 
+    // Client-side lockout check (UX only — server re-validates)
     const rl = getRateLimit();
     if (rl.lockedUntil > Date.now()) {
-      startLockoutTimer(rl.lockedUntil);
-      return;
-    }
-
-    // Basic email format guard before hitting the server
-    if (!email.trim().includes("@")) {
-      toast.error("Enter a valid email address.");
+      const secs = Math.ceil((rl.lockedUntil - Date.now()) / 1000);
+      toast.error(`Too many attempts. Try again in ${secs}s.`);
       return;
     }
 
     setBusy(true);
 
-    // Server-side rate limit check — enforced independent of client state
-    const rateLimitResult = await checkLoginRateLimit({ data: { identifier: email } }).catch(() => null);
-    if (rateLimitResult && !rateLimitResult.allowed) {
-      const until = Date.now() + (rateLimitResult.retryAfterSeconds ?? LOCKOUT_MS / 1000) * 1000;
-      setRateLimit(MAX_ATTEMPTS, until);
-      startLockoutTimer(until);
-      toast.error("Too many failed attempts. Locked for 15 minutes.");
-      setBusy(false);
-      return;
-    }
-
-    const { error } = await supabase.auth.signInWithPassword({
-      email: email.trim().toLowerCase(),
-      password,
-    });
-    setBusy(false);
-
-    if (error) {
-      // Record failed attempt server-side (hashed — no plaintext stored)
-      void recordFailedLogin({ data: { identifier: email } }).catch(() => {});
-
-      // Also increment client-side counter
-      const newAttempts = rl.attempts + 1;
-      if (newAttempts >= MAX_ATTEMPTS) {
-        const until = Date.now() + LOCKOUT_MS;
-        setRateLimit(newAttempts, until);
-        startLockoutTimer(until);
-        toast.error("Too many failed attempts. Locked for 15 minutes.");
-      } else {
-        setRateLimit(newAttempts, 0);
-        // Use a generic message — never expose whether email exists
-        toast.error(`Invalid credentials. ${MAX_ATTEMPTS - newAttempts} attempt(s) remaining.`);
+    try {
+      // ── 1. Server-side rate limit check ────────────────────────────────────
+      const limitResult = await checkLoginRateLimit({ data: { identifier: email } });
+      if (!limitResult.allowed) {
+        const newLockedUntil = Date.now() + (limitResult.retryAfterSeconds ?? LOCKOUT_MS / 1000) * 1000;
+        setLockedUntil(newLockedUntil);
+        setRateLimit(MAX_ATTEMPTS, newLockedUntil);
+        toast.error(`Too many failed attempts. Try again in ${limitResult.retryAfterSeconds}s.`);
+        setBusy(false);
+        return;
       }
-      return;
-    }
 
-    // Success — clear the counter
-    setRateLimit(0, 0);
-    navigate({ to: "/admin" });
-  };
+      // ── 2. Supabase authentication ─────────────────────────────────────────
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+
+      if (error || !data.session) {
+        // Record the failure server-side for rate limiting
+        await recordFailedLogin({ data: { identifier: email } });
+
+        // Update client-side counter
+        const newAttempts = rl.attempts + 1;
+        const newLockedUntil = newAttempts >= MAX_ATTEMPTS ? Date.now() + LOCKOUT_MS : 0;
+        setRateLimit(newAttempts, newLockedUntil);
+        if (newLockedUntil) setLockedUntil(newLockedUntil);
+
+        // Generic error — never reveal whether the email exists
+        toast.error("Invalid email or password.");
+        setBusy(false);
+        return;
+      }
+
+      // ── 3. Success ─────────────────────────────────────────────────────────
+      // Clear client-side rate limit counter on successful login
+      setRateLimit(0, 0);
+      void navigate({ to: "/admin" });
+
+    } catch {
+      toast.error("An unexpected error occurred. Please try again.");
+      setBusy(false);
+    }
+  }
+
+  const isLocked = lockedUntil > Date.now();
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-hero px-4">
-      <div className="w-full max-w-md rounded-2xl border border-border bg-card p-8 shadow-elegant">
-        <Link to="/" className="flex items-center justify-center gap-2 font-semibold">
-          <img src={logoSrc} alt="Cognivus" className="h-8 w-auto rounded-md" />
-          Cognivus Admin
-        </Link>
-        <h1 className="mt-6 text-center text-2xl font-bold tracking-tight">Sign in</h1>
-
-        {/* System status indicator — no credential info exposed */}
-        <div className="mt-5">
-          {status.state === "checking" && (
-            <div className="flex items-center gap-2 rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              Verifying system status…
-            </div>
-          )}
-          {status.state === "ready" && (
-            <div className="flex items-center gap-2 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-700 dark:text-emerald-300">
-              <CheckCircle2 className="h-3.5 w-3.5" />
-              System ready.
-            </div>
-          )}
-          {status.state === "no-admin" && (
-            <div className="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
-              <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-              No admin account found. Run the provisioning script to create one.
-            </div>
-          )}
-          {status.state === "error" && (
-            <div className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
-              <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-              Unable to reach the server. Check your connection.
-            </div>
-          )}
-          {isLocked && (
-            <div className="mt-2 flex items-center gap-2 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
-              <ShieldAlert className="h-3.5 w-3.5 shrink-0" />
-              Too many attempts — locked for {Math.floor(secondsLeft / 60)}m {secondsLeft % 60}s.
-            </div>
-          )}
+    <div className="flex min-h-screen items-center justify-center bg-background px-4">
+      <div className="w-full max-w-sm space-y-6">
+        <div className="text-center">
+          <Link to="/">
+            <img src={logoSrc} alt="Cognivus" className="mx-auto h-10 w-auto" />
+          </Link>
+          <h1 className="mt-4 text-2xl font-bold tracking-tight">Admin Login</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Sign in to manage your Cognivus site.
+          </p>
         </div>
 
-        <form onSubmit={submit} className="mt-6 space-y-4" autoComplete="on">
-          <div>
-            <label htmlFor="email" className="text-sm font-medium">Email</label>
-            <input
-              id="email"
-              type="email"
-              name="email"
-              required
-              autoComplete="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              disabled={isLocked || busy}
-              className="mt-1.5 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
-            />
+        {status.state === "checking" && (
+          <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" /> Checking setup…
           </div>
-          <div>
-            <label htmlFor="password" className="text-sm font-medium">Password</label>
-            <input
-              id="password"
-              type="password"
-              name="password"
-              required
-              autoComplete="current-password"
-              minLength={8}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              disabled={isLocked || busy}
-              className="mt-1.5 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
-            />
-          </div>
-          <button
-            type="submit"
-            disabled={busy || isLocked || status.state === "checking"}
-            className="w-full rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground shadow-soft hover:shadow-elegant disabled:opacity-60"
-          >
-            {busy ? "Signing in…" : "Sign in"}
-          </button>
-        </form>
+        )}
 
-        <Link to="/" className="mt-6 block text-center text-xs text-muted-foreground hover:text-foreground">
-          ← Back to website
-        </Link>
+        {status.state === "no-admin" && (
+          <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm dark:border-amber-800 dark:bg-amber-950">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+            <div>
+              <p className="font-medium text-amber-800 dark:text-amber-200">No admin account found</p>
+              <p className="mt-0.5 text-amber-700 dark:text-amber-300">
+                Run <code className="rounded bg-amber-100 px-1 dark:bg-amber-900">npx tsx scripts/provision-admin.ts</code> to create one.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {status.state === "error" && (
+          <div className="flex items-start gap-3 rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
+            <p className="text-destructive">Could not connect. Check your configuration.</p>
+          </div>
+        )}
+
+        {isLocked && (
+          <div className="flex items-start gap-3 rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm">
+            <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
+            <p className="text-destructive">
+              Too many failed attempts. Try again in <strong>{secondsLeft}s</strong>.
+            </p>
+          </div>
+        )}
+
+        {(status.state === "ready" || status.state === "no-admin") && (
+          <form
+            onSubmit={handleSubmit}
+            className="space-y-4 rounded-2xl border border-border bg-card p-6 shadow-soft"
+            autoComplete="off"
+          >
+            <div>
+              <label htmlFor="email" className="text-sm font-medium">Email</label>
+              <input
+                id="email"
+                type="email"
+                name="email"
+                required
+                autoComplete="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                disabled={busy || isLocked}
+                className="mt-1.5 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-60"
+              />
+            </div>
+            <div>
+              <label htmlFor="password" className="text-sm font-medium">Password</label>
+              <input
+                id="password"
+                type="password"
+                name="password"
+                required
+                autoComplete="current-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                disabled={busy || isLocked}
+                className="mt-1.5 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-60"
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={busy || isLocked || status.state !== "ready"}
+              className="w-full rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground shadow-soft hover:shadow-elegant disabled:opacity-60"
+            >
+              {busy ? (
+                <span className="flex items-center justify-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" /> Signing in…
+                </span>
+              ) : "Sign in"}
+            </button>
+          </form>
+        )}
+
+        {status.state === "ready" && (
+          <p className="text-center text-xs text-muted-foreground">
+            <CheckCircle2 className="mr-1 inline h-3 w-3 text-emerald-500" />
+            Admin account configured
+          </p>
+        )}
       </div>
     </div>
   );

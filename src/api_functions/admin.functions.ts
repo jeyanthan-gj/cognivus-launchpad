@@ -1,22 +1,34 @@
 import { createServerFn } from "@tanstack/react-start";
 import { createHash } from "crypto";
+import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { log } from "@/lib/logger";
+import { validateServerEnv } from "@/lib/env";
 
-// ── Rate limiting constants ───────────────────────────────────────────────────
+// ── Startup validation ────────────────────────────────────────────────────────
+// Fail fast if required secrets are absent rather than propagating undefined.
+validateServerEnv();
+
+// ── Constants ─────────────────────────────────────────────────────────────────
 const MAX_ATTEMPTS = 5;
 const WINDOW_MINUTES = 15;
-
-// ── Minimum password policy ───────────────────────────────────────────────────
-// Enforced server-side so it cannot be bypassed by a crafted request.
 const PASSWORD_MIN_LENGTH = 12;
 const PASSWORD_POLICY = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{12,}$/;
 
-/**
- * Hashes an identifier (email/IP) with a consistent salt so plaintext is
- * never stored in the DB. The salt is application-specific but not secret —
- * its purpose is domain-separation, not key-stretching.
- */
+// ── Input validators (Zod) ────────────────────────────────────────────────────
+// Using .validator() tells TanStack Start the input shape, which fixes the
+// ServerFnCtx<..., TInputValidator> data type and enables proper TS inference.
+const identifierSchema = z.object({
+  identifier: z.string().min(1).max(320),
+});
+
+const passwordSchema = z.object({
+  password: z.string().min(1).max(1024),
+});
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
 function hashIdentifier(identifier: string): string {
   return createHash("sha256")
     .update("cognivus-login-attempt:")
@@ -24,192 +36,184 @@ function hashIdentifier(identifier: string): string {
     .digest("hex");
 }
 
+/** First 8 hex chars of the hash — enough for log correlation without exposing identity. */
+function identifierHint(identifier: string): string {
+  return hashIdentifier(identifier).slice(0, 8);
+}
+
 /**
- * Constant-time string comparison — prevents timing-based enumeration of
- * stored hashed identifiers. Uses XOR across all characters so the function
- * always takes the same number of operations regardless of where strings differ.
- * Safe to use here because inputs are fixed-length hex digests (SHA-256 = 64 chars).
- *
- * Note: Buffer/timingSafeEqual from Node's "crypto" module cannot be imported
- * at the top level in this file because Vite's client bundle also processes it.
- * This pure-JS fallback is equivalent for fixed-length hex strings.
+ * Constant-time XOR comparison for fixed-length SHA-256 hex strings.
+ * Cannot import timingSafeEqual at top-level — Vite externalises Node built-ins
+ * during the client bundle pass.
  */
 function safeCompare(a: string, b: string): boolean {
   if (a.length !== b.length) return false;
   let diff = 0;
-  for (let i = 0; i < a.length; i++) {
-    diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  }
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
   return diff === 0;
 }
+void safeCompare; // suppress unused-var
 
-/**
- * Returns only a boolean indicating whether at least one admin user exists.
- * No emails, credentials, or PII are exposed to the client.
- *
- * Admin provisioning is done exclusively via the CLI script
- * (`scripts/provision-admin.ts`) or the Supabase dashboard.
- */
+// login_attempts and must_change_password exist in the DB but are absent from
+// the auto-generated types.ts (Supabase CLI hasn't re-introspected the latest
+// security migrations). Cast to `any` until `supabase gen types` is re-run.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const db = supabaseAdmin as any;
+
+// ── Server functions ──────────────────────────────────────────────────────────
+
+/** Returns a boolean: is at least one admin account provisioned? */
 export const getAdminReady = createServerFn({ method: "GET" }).handler(async () => {
-  const { data: roles, error } = await supabaseAdmin
-    .from("user_roles")
-    .select("id")
-    .eq("role", "admin")
-    .limit(1);
+  try {
+    const { data: roles, error } = await supabaseAdmin
+      .from("user_roles")
+      .select("id")
+      .eq("role", "admin")
+      .limit(1);
 
-  if (error) {
-    // Return false without leaking internal error details to the client
+    if (error) {
+      log.apiError("getAdminReady", error);
+      return { ready: false };
+    }
+    return { ready: (roles?.length ?? 0) > 0 };
+  } catch (err) {
+    log.apiError("getAdminReady", err);
     return { ready: false };
   }
-
-  return { ready: (roles?.length ?? 0) > 0 };
 });
 
 /**
- * Server-side rate-limit check for login attempts.
- *
- * Call this BEFORE calling supabase.auth.signInWithPassword on the client.
- * Identifiers are hashed (SHA-256 + domain prefix) — plaintext is never stored.
- *
- * Returns { allowed: true } if the attempt is within limits, or
- * { allowed: false, retryAfterSeconds } if the account is locked.
+ * Server-side rate-limit check — call BEFORE supabase.auth.signInWithPassword.
+ * Identifiers are hashed (SHA-256 + domain prefix); plaintext is never stored.
  */
-export const checkLoginRateLimit = createServerFn({ method: "POST" }).handler(
-  async ({ data }: { data: { identifier: string } }) => {
-    // Validate input — reject missing or obviously invalid identifiers
-    if (!data?.identifier || typeof data.identifier !== "string") {
-      return { allowed: false, retryAfterSeconds: WINDOW_MINUTES * 60 };
-    }
-
+export const checkLoginRateLimit = createServerFn({ method: "POST" })
+  .inputValidator(identifierSchema)
+  .handler(async ({ data }) => {
     const trimmed = data.identifier.trim();
-    if (trimmed.length === 0 || trimmed.length > 320) {
-      return { allowed: false, retryAfterSeconds: WINDOW_MINUTES * 60 };
-    }
 
-    const hashed = hashIdentifier(trimmed);
-    const windowStart = new Date(Date.now() - WINDOW_MINUTES * 60 * 1000).toISOString();
+    try {
+      const hashed = hashIdentifier(trimmed);
+      const windowStart = new Date(Date.now() - WINDOW_MINUTES * 60 * 1000).toISOString();
 
-    // Prune expired attempts before counting (keep table lean)
-    await supabaseAdmin
-      .from("login_attempts")
-      .delete()
-      .lt("attempted_at", windowStart);
+      // Prune expired rows before counting (keeps the table lean)
+      await db.from("login_attempts").delete().lt("attempted_at", windowStart);
 
-    const { count } = await supabaseAdmin
-      .from("login_attempts")
-      .select("id", { count: "exact", head: true })
-      .eq("identifier", hashed)
-      .gte("attempted_at", windowStart);
-
-    if ((count ?? 0) >= MAX_ATTEMPTS) {
-      // Find the oldest attempt in the window to compute precise unlock time
-      const { data: oldest } = await supabaseAdmin
+      const { count } = await db
         .from("login_attempts")
-        .select("attempted_at")
+        .select("id", { count: "exact", head: true })
         .eq("identifier", hashed)
-        .gte("attempted_at", windowStart)
-        .order("attempted_at", { ascending: true })
-        .limit(1);
+        .gte("attempted_at", windowStart);
 
-      const lockLiftAt = oldest?.[0]?.attempted_at
-        ? new Date(oldest[0].attempted_at).getTime() + WINDOW_MINUTES * 60 * 1000
-        : Date.now() + WINDOW_MINUTES * 60 * 1000;
+      if ((count ?? 0) >= MAX_ATTEMPTS) {
+        const { data: oldest } = await db
+          .from("login_attempts")
+          .select("attempted_at")
+          .eq("identifier", hashed)
+          .gte("attempted_at", windowStart)
+          .order("attempted_at", { ascending: true })
+          .limit(1);
 
-      const retryAfterSeconds = Math.ceil((lockLiftAt - Date.now()) / 1000);
-      return { allowed: false, retryAfterSeconds: Math.max(retryAfterSeconds, 0) };
+        const lockLiftAt = oldest?.[0]?.attempted_at
+          ? new Date(oldest[0].attempted_at).getTime() + WINDOW_MINUTES * 60 * 1000
+          : Date.now() + WINDOW_MINUTES * 60 * 1000;
+
+        const retryAfterSeconds = Math.ceil((lockLiftAt - Date.now()) / 1000);
+
+        log.suspiciousActivity("rate_limit_exceeded", {
+          detail: `login blocked identifierHint=${identifierHint(trimmed)}`,
+          count: count ?? MAX_ATTEMPTS,
+        });
+        log.authAttempt("login_locked", { identifierHint: identifierHint(trimmed) });
+        return { allowed: false, retryAfterSeconds: Math.max(retryAfterSeconds, 0) };
+      }
+
+      return { allowed: true, retryAfterSeconds: undefined };
+    } catch (err) {
+      log.apiError("checkLoginRateLimit", err);
+      // Fail open — a server error must not block legitimate logins.
+      return { allowed: true, retryAfterSeconds: undefined };
     }
-
-    return { allowed: true };
-  },
-);
+  });
 
 /**
- * Records a failed login attempt for the given identifier.
- * Call this AFTER a failed signInWithPassword.
- * The identifier is hashed before storage — never stored in plaintext.
+ * Records a failed login attempt.
+ * Call AFTER a failed signInWithPassword. Identifier is hashed before storage.
  */
-export const recordFailedLogin = createServerFn({ method: "POST" }).handler(
-  async ({ data }: { data: { identifier: string } }) => {
-    if (!data?.identifier || typeof data.identifier !== "string") {
-      return { ok: false };
-    }
-
+export const recordFailedLogin = createServerFn({ method: "POST" })
+  .inputValidator(identifierSchema)
+  .handler(async ({ data }) => {
     const trimmed = data.identifier.trim();
-    if (trimmed.length === 0 || trimmed.length > 320) {
+    try {
+      await db.from("login_attempts").insert({ identifier: hashIdentifier(trimmed) });
+      log.authAttempt("login_failed", { identifierHint: identifierHint(trimmed) });
+      return { ok: true };
+    } catch (err) {
+      log.apiError("recordFailedLogin", err);
       return { ok: false };
     }
-
-    const hashed = hashIdentifier(trimmed);
-    await supabaseAdmin.from("login_attempts").insert({ identifier: hashed });
-    return { ok: true };
-  },
-);
+  });
 
 /**
- * Server-side password policy enforcement.
- *
- * Validates the new password against our policy BEFORE forwarding to Supabase.
- * This prevents bypassing client-side validation via direct API calls.
- * Requires a valid Bearer token (auth middleware).
- *
- * SECURITY: The actual password update is performed by Supabase's auth layer
- * which stores only a bcrypt hash (cost factor 10+). Plain passwords are never
- * logged or stored.
+ * Server-side password policy enforcement + update.
+ * Policy is validated HERE (server) — cannot be bypassed by crafted API calls.
+ * Supabase stores only a bcrypt hash; plaintext is never logged or persisted.
  */
 export const validateAndUpdatePassword = createServerFn({ method: "POST" })
+  .inputValidator(passwordSchema)
   .middleware([requireSupabaseAuth])
-  .handler(async ({ data, context }: { data: { password: string }; context: { userId: string } }) => {
-    const { password } = data ?? {};
+  .handler(async ({ data, context }) => {
+    const { password } = data;
+    const userId = (context as { userId: string }).userId;
 
-    // Validate input type
-    if (!password || typeof password !== "string") {
-      return { ok: false, error: "Invalid request." };
-    }
-
-    // Server-side policy check — cannot be bypassed via direct API calls
     if (password.length < PASSWORD_MIN_LENGTH) {
+      log.authAttempt("password_change_failed", { userId, identifierHint: "policy_length" });
       return { ok: false, error: `Password must be at least ${PASSWORD_MIN_LENGTH} characters.` };
     }
 
     if (!PASSWORD_POLICY.test(password)) {
+      log.authAttempt("password_change_failed", { userId, identifierHint: "policy_complexity" });
       return {
         ok: false,
         error: "Password must include uppercase, lowercase, a digit, and a special character.",
       };
     }
 
-    // Update via service role so we can act on behalf of the authenticated user.
-    // The middleware already verified the JWT — context.userId is trustworthy.
-    const { error } = await supabaseAdmin.auth.admin.updateUserById(context.userId, {
-      password,
-    });
-
-    if (error) {
-      // Log server-side; return a generic message to the client
-      console.error("[validateAndUpdatePassword] Supabase error:", error.message);
-      return { ok: false, error: "Password update failed. Please try again." };
+    try {
+      const { error } = await supabaseAdmin.auth.admin.updateUserById(userId, { password });
+      if (error) {
+        log.apiError("validateAndUpdatePassword", error, { statusCode: 500 });
+        log.authAttempt("password_change_failed", { userId });
+        return { ok: false, error: "Password update failed. Please try again." };
+      }
+      log.authAttempt("password_changed", { userId });
+      return { ok: true, error: undefined };
+    } catch (err) {
+      log.apiError("validateAndUpdatePassword", err, { statusCode: 500 });
+      return { ok: false, error: "An unexpected error occurred." };
     }
-
-    return { ok: true };
   });
 
 /**
- * Clears the must_change_password flag for the authenticated admin.
- * Called by the Account page after a successful password update.
- * Requires a valid Bearer token — uses the auth middleware.
+ * Clears the must_change_password flag after a successful password update.
  */
 export const clearMustChangePassword = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { error } = await supabaseAdmin
-      .from("user_roles")
-      .update({ must_change_password: false })
-      .eq("user_id", context.userId)
-      .eq("role", "admin");
+    const userId = (context as { userId: string }).userId;
+    try {
+      const { error } = await db
+        .from("user_roles")
+        .update({ must_change_password: false })
+        .eq("user_id", userId)
+        .eq("role", "admin");
 
-    if (error) {
-      console.error("[clearMustChangePassword] Failed:", error.message);
+      if (error) {
+        log.apiError("clearMustChangePassword", error);
+      } else {
+        log.info("must_change_password_cleared", { userId });
+      }
+    } catch (err) {
+      log.apiError("clearMustChangePassword", err);
     }
-
     return { ok: true };
   });

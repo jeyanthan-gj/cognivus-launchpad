@@ -1,7 +1,119 @@
+# ══════════════════════════════════════════════════════════════════════════════
+# Netlify configuration — Cognivus
+# Covers: build, HTTPS enforcement, security headers, CORS, and redirects.
+# ══════════════════════════════════════════════════════════════════════════════
+
 [build]
   command = "npm run build"
   publish = "dist/client"
 
 [build.environment]
-  NODE_VERSION  = "22"
-  NPM_VERSION   = "10"
+  NODE_VERSION = "22"
+  NPM_VERSION  = "10"
+
+# ── HTTPS enforcement ─────────────────────────────────────────────────────────
+# Force all HTTP traffic to HTTPS at the CDN edge, before it touches the app.
+[build.processing]
+  skip_processing = false
+
+# ── HTTP → HTTPS redirect (edge-level, before any app code runs) ──────────────
+[[redirects]]
+  from   = "http://cognivus.ai/*"
+  to     = "https://cognivus.ai/:splat"
+  status = 301
+  force  = true
+
+[[redirects]]
+  from   = "http://www.cognivus.ai/*"
+  to     = "https://cognivus.ai/:splat"
+  status = 301
+  force  = true
+
+# www → apex redirect (canonical domain)
+[[redirects]]
+  from   = "https://www.cognivus.ai/*"
+  to     = "https://cognivus.ai/:splat"
+  status = 301
+  force  = true
+
+# ── Security headers (applied to every response) ─────────────────────────────
+[[headers]]
+  for = "/*"
+  [headers.values]
+
+    # ── HTTPS / transport ────────────────────────────────────────────────────
+    # Strict-Transport-Security: 2 years, include subdomains, preload-eligible.
+    # Once set, browsers will refuse plain HTTP connections for 2 years.
+    Strict-Transport-Security = "max-age=63072000; includeSubDomains; preload"
+
+    # ── Framing / clickjacking ───────────────────────────────────────────────
+    X-Frame-Options = "DENY"
+
+    # ── MIME sniffing ────────────────────────────────────────────────────────
+    X-Content-Type-Options = "nosniff"
+
+    # ── Referrer policy ──────────────────────────────────────────────────────
+    # Send origin only on same-origin requests; nothing cross-origin.
+    Referrer-Policy = "strict-origin-when-cross-origin"
+
+    # ── Permissions policy ───────────────────────────────────────────────────
+    # Disable browser features this app never needs.
+    Permissions-Policy = "camera=(), microphone=(), geolocation=(), payment=(), usb=(), bluetooth=()"
+
+    # ── Cross-Origin policies ────────────────────────────────────────────────
+    Cross-Origin-Opener-Policy   = "same-origin"
+    Cross-Origin-Resource-Policy = "same-origin"
+    Cross-Origin-Embedder-Policy = "require-corp"
+
+    # ── Content Security Policy ──────────────────────────────────────────────
+    # Blocks XSS, inline script injection, and unauthorized resource loading.
+    #
+    # Trusted sources:
+    #   - self          : same origin (JS, CSS, images, fonts served by Netlify)
+    #   - supabase.co   : API calls from the client SDK
+    #   - fonts.googleapis.com / fonts.gstatic.com : Google Fonts (CSS + woff2)
+    #
+    # 'unsafe-inline' for style-src is required by Tailwind's runtime injection
+    # and Radix UI. Eliminate this if you move to a fully static CSS build.
+    #
+    # object-src 'none' blocks Flash / plugins entirely.
+    # base-uri   'self' prevents base-tag injection attacks.
+    Content-Security-Policy = """
+      default-src 'self';
+      script-src 'self' 'unsafe-inline';
+      style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+      font-src 'self' https://fonts.gstatic.com;
+      img-src 'self' data: blob: https://*.supabase.co;
+      connect-src 'self' https://*.supabase.co wss://*.supabase.co;
+      frame-ancestors 'none';
+      object-src 'none';
+      base-uri 'self';
+      form-action 'self';
+      upgrade-insecure-requests;
+    """
+
+# ── Static asset cache headers ────────────────────────────────────────────────
+# Hashed bundles can be cached forever (Vite appends content hashes).
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+# ── Admin routes — extra no-cache ─────────────────────────────────────────────
+# Prevents browsers from serving stale admin pages from the back-forward cache.
+[[headers]]
+  for = "/admin/*"
+  [headers.values]
+    Cache-Control = "no-store, no-cache, must-revalidate"
+    Pragma        = "no-cache"
+
+# ── CORS for Netlify Functions / SSR API endpoints ───────────────────────────
+# TanStack Start server functions are served from the same origin, so broad
+# CORS is not needed. These headers restrict pre-flight to the apex domain only.
+[[headers]]
+  for = "/_server/*"
+  [headers.values]
+    Access-Control-Allow-Origin  = "https://cognivus.ai"
+    Access-Control-Allow-Methods = "GET, POST, OPTIONS"
+    Access-Control-Allow-Headers = "Content-Type, Authorization"
+    Access-Control-Max-Age       = "86400"

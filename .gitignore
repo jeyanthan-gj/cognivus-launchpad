@@ -1,21 +1,11 @@
-# Environment variables — never commit real secrets
+# ── Secrets — NEVER commit these ─────────────────────────────────────────────
 .env
 .env.*
 !.env.example
+.dev.vars
+secrets/
 
-# Lockfile — use npm (package-lock.json is the canonical lockfile)
-bun.lockb
-bunfig.toml
-
-# Logs
-logs
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
-
+# ── Build output ──────────────────────────────────────────────────────────────
 node_modules
 dist
 dist-ssr
@@ -23,19 +13,30 @@ dist-ssr
 .vinxi
 .tanstack/**
 .nitro
-*.local
 
-# Wrangler / Cloudflare
+# ── Runtime / framework cache ─────────────────────────────────────────────────
 .wrangler/
-.dev.vars
 
-# Editor directories and files
+# ── Logs — never commit log files (may contain PII or internal errors) ────────
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ── OS / editor artifacts ─────────────────────────────────────────────────────
+.DS_Store
+*.local
 .vscode/*
 !.vscode/extensions.json
 .idea
-.DS_Store
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
+
+# ── Bun (project uses npm) ────────────────────────────────────────────────────
+bun.lockb
+bunfig.toml
