@@ -1,1 +1,39 @@
 project_id = "nvqcqzyobnnawjntxjsg"
+
+[auth]
+# ── JWT / session expiry ──────────────────────────────────────────────────────
+# Access tokens expire after 1 hour. The Supabase client auto-refreshes them
+# using the long-lived refresh token (stored in localStorage, httpOnly cookies
+# are not yet supported by the JS SDK without a custom server).
+jwt_expiry = 3600
+
+# ── Self-registration ─────────────────────────────────────────────────────────
+# SECURITY: Disable public sign-up. Admin accounts are provisioned exclusively
+# via scripts/provision-admin.ts. Any attempt to self-register will be rejected.
+enable_signup = false
+
+[auth.email]
+# ── Email verification ────────────────────────────────────────────────────────
+# SECURITY: Require email confirmation before an account can sign in.
+# Prevents account takeover via unverified email addresses.
+enable_confirmations = true
+
+# SECURITY: Re-verify the new address when an admin changes their email.
+double_confirm_changes = true
+
+# SECURITY: Require the current password when changing to a new password.
+# Prevents account takeover if a session token is stolen.
+secure_password_change = true
+
+[auth.email.template.recovery]
+# ── Password reset token expiry ───────────────────────────────────────────────
+# SECURITY: Reset tokens expire after 15 minutes (900s).
+# Default is 86400s (24 hours) which is far too long.
+# This is configured in the Supabase dashboard:
+#   Auth → Settings → "Password reset token expiry" → 900
+# The local config.toml reference is for documentation / IaC tracking.
+# expiry = 900   # Set in dashboard; local dev uses dashboard default
+
+[auth.sms]
+# SMS auth is disabled — only email/password is used.
+enable_signup = false

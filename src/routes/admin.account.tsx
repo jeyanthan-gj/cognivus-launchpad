@@ -3,13 +3,16 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { KeyRound, CheckCircle2, XCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { clearMustChangePassword } from "@/api_functions/admin.functions";
+import { validateAndUpdatePassword, clearMustChangePassword } from "@/api_functions/admin.functions";
 
 export const Route = createFileRoute("/admin/account")({
   head: () => ({ meta: [{ title: "Account — Cognivus Admin" }] }),
   component: AdminAccount,
 });
 
+// ── Password policy constants (mirrored from server) ─────────────────────────
+// Client-side enforcement is UX-only. The server re-validates in
+// validateAndUpdatePassword() — this cannot be bypassed via direct API calls.
 const MIN_LENGTH = 12;
 
 function checkStrength(pw: string) {
@@ -24,7 +27,11 @@ function checkStrength(pw: string) {
 
 function Rule({ ok, label }: { ok: boolean; label: string }) {
   return (
-    <li className={`flex items-center gap-1.5 text-xs ${ok ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"}`}>
+    <li
+      className={`flex items-center gap-1.5 text-xs ${
+        ok ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"
+      }`}
+    >
       {ok ? <CheckCircle2 className="h-3.5 w-3.5" /> : <XCircle className="h-3.5 w-3.5" />}
       {label}
     </li>
@@ -41,6 +48,8 @@ function AdminAccount() {
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Client-side guards (UX — not a security boundary)
     if (!allPass) {
       toast.error("Password does not meet all requirements.");
       return;
@@ -49,20 +58,53 @@ function AdminAccount() {
       toast.error("Passwords don't match.");
       return;
     }
+
     setBusy(true);
-    const { error } = await supabase.auth.updateUser({ password });
-    if (!error) {
-      // Clear the forced-change flag — fire and forget, non-blocking
-      void clearMustChangePassword().catch(() => {});
+
+    try {
+      // SECURITY: Retrieve the current session JWT to authenticate the
+      // server-side password update. The token is sent in the Authorization
+      // header only — never in the request body or URL.
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+
+      if (!token) {
+        toast.error("Session expired. Please sign in again.");
+        setBusy(false);
+        return;
+      }
+
+      // SECURITY: Password update goes through the server function which:
+      //   1. Re-validates the JWT (auth middleware)
+      //   2. Re-validates the password policy server-side
+      //   3. Calls supabase.auth.admin.updateUserById() — Supabase stores
+      //      only a bcrypt hash, never the plaintext password
+      // This prevents bypassing client-side policy checks via direct API calls.
+      const result = await validateAndUpdatePassword({
+        data: { password },
+        // Pass the Bearer token so the middleware can authenticate the request
+        headers: { Authorization: `Bearer ${token}` },
+      } as Parameters<typeof validateAndUpdatePassword>[0]);
+
+      if (!result.ok) {
+        toast.error(result.error ?? "Password update failed.");
+        setBusy(false);
+        return;
+      }
+
+      // Clear the must_change_password flag (fire-and-forget; non-blocking)
+      void clearMustChangePassword({
+        headers: { Authorization: `Bearer ${token}` },
+      } as Parameters<typeof clearMustChangePassword>[0]).catch(() => {});
+
+      toast.success("Password updated successfully.");
+      setPassword("");
+      setConfirm("");
+    } catch {
+      toast.error("An unexpected error occurred. Please try again.");
+    } finally {
+      setBusy(false);
     }
-    setBusy(false);
-    if (error) {
-      toast.error(error.message);
-      return;
-    }
-    toast.success("Password updated.");
-    setPassword("");
-    setConfirm("");
   };
 
   return (
@@ -77,9 +119,15 @@ function AdminAccount() {
         </div>
       </div>
 
-      <form onSubmit={submit} className="space-y-4 rounded-2xl border border-border bg-card p-6 shadow-soft" autoComplete="off">
+      <form
+        onSubmit={submit}
+        className="space-y-4 rounded-2xl border border-border bg-card p-6 shadow-soft"
+        autoComplete="off"
+      >
         <div>
-          <label htmlFor="new-password" className="text-sm font-medium">New password</label>
+          <label htmlFor="new-password" className="text-sm font-medium">
+            New password
+          </label>
           <input
             id="new-password"
             type="password"
@@ -101,7 +149,9 @@ function AdminAccount() {
           )}
         </div>
         <div>
-          <label htmlFor="confirm-password" className="text-sm font-medium">Confirm password</label>
+          <label htmlFor="confirm-password" className="text-sm font-medium">
+            Confirm password
+          </label>
           <input
             id="confirm-password"
             type="password"

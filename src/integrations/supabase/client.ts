@@ -2,10 +2,6 @@ import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
 function createSupabaseClient() {
-  // import.meta.env.VITE_* is replaced at build time by Vite for both the
-  // browser bundle and SSR bundle — no process.env needed here.
-  // process.env is intentionally avoided: it is undefined in browser bundles
-  // and using it would require a polyfill or cause a ReferenceError.
   const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string | undefined;
   const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined;
 
@@ -19,19 +15,27 @@ function createSupabaseClient() {
     throw new Error(message);
   }
 
+  // SECURITY: Only the anon/publishable key is used here. This key is safe to
+  // expose to the browser because Supabase's Row Level Security (RLS) policies
+  // enforce access control. The service-role key (which bypasses RLS) is
+  // exclusively read in server-only code (client.server.ts) via process.env
+  // and is never bundled into the client-side JavaScript.
   return createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
     auth: {
+      // SECURITY: Use localStorage for session persistence (standard for SPAs).
+      // Sessions are scoped to the origin and not accessible cross-origin.
+      // The JWT is validated server-side on every protected server function call.
       storage: typeof window !== 'undefined' ? localStorage : undefined,
       persistSession: true,
       autoRefreshToken: true,
-    }
+      // SECURITY: detect session in URL hash (for OAuth/magic-link flows)
+      detectSessionInUrl: true,
+    },
   });
 }
 
 let _supabase: ReturnType<typeof createSupabaseClient> | undefined;
 
-// Import the supabase client like this:
-// import { supabase } from "@/integrations/supabase/client";
 export const supabase = new Proxy({} as ReturnType<typeof createSupabaseClient>, {
   get(_, prop, receiver) {
     if (!_supabase) _supabase = createSupabaseClient();
