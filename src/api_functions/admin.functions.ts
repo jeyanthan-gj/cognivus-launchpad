@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { createHash, timingSafeEqual } from "crypto";
+import { createHash } from "crypto";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
@@ -26,15 +26,21 @@ function hashIdentifier(identifier: string): string {
 
 /**
  * Constant-time string comparison — prevents timing-based enumeration of
- * stored hashed identifiers. Falls back to false on length mismatch without
- * leaking timing information.
+ * stored hashed identifiers. Uses XOR across all characters so the function
+ * always takes the same number of operations regardless of where strings differ.
+ * Safe to use here because inputs are fixed-length hex digests (SHA-256 = 64 chars).
+ *
+ * Note: Buffer/timingSafeEqual from Node's "crypto" module cannot be imported
+ * at the top level in this file because Vite's client bundle also processes it.
+ * This pure-JS fallback is equivalent for fixed-length hex strings.
  */
 function safeCompare(a: string, b: string): boolean {
-  try {
-    return timingSafeEqual(Buffer.from(a, "utf8"), Buffer.from(b, "utf8"));
-  } catch {
-    return false;
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) {
+    diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
   }
+  return diff === 0;
 }
 
 /**
