@@ -4,16 +4,13 @@ import { z } from "zod";
 import { Mail, Send } from "lucide-react";
 import { toast } from "sonner";
 import { SiteLayout } from "@/components/site/SiteLayout";
-import { supabase } from "@/integrations/supabase/client";
+import { submitContact } from "@/api_functions/contact.functions";
 
 export const Route = createFileRoute("/contact")({
   head: () => ({
     meta: [
       { title: "Contact — Cognivus" },
-      {
-        name: "description",
-        content: "Get in touch with Cognivus to discuss your AI project.",
-      },
+      { name: "description", content: "Get in touch with Cognivus to discuss your AI project." },
       { property: "og:title", content: "Contact — Cognivus" },
       { property: "og:description", content: "Let's talk about your AI project." },
     ],
@@ -21,10 +18,10 @@ export const Route = createFileRoute("/contact")({
   component: ContactPage,
 });
 
-const schema = z.object({
+const clientSchema = z.object({
   name: z.string().trim().min(1, "Name is required").max(200),
   email: z.string().trim().email("Invalid email").max(320),
-  message: z.string().trim().min(1, "Message is required").max(5000),
+  message: z.string().trim().min(10, "Message must be at least 10 characters").max(5000),
 });
 
 function ContactPage() {
@@ -32,39 +29,58 @@ function ContactPage() {
   // Honeypot: bots fill hidden fields; humans don't see them
   const [honeypot, setHoneypot] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  // Simple timing check: humans take at least 3s to fill a form
-  const mountedAt = useState(() => Date.now())[0];
+  // Record the time the form mounted — server validates minimum elapsed time
+  const [mountedAt] = useState(() => Date.now());
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Honeypot triggered — silently drop without feedback to the bot
-    if (honeypot) {
-      setForm({ name: "", email: "", message: "" });
-      toast.success("Message sent. We'll be in touch shortly.");
-      return;
-    }
-
-    // Too fast — likely automated
-    if (Date.now() - mountedAt < 3000) {
-      toast.error("Please take a moment to fill out the form.");
-      return;
-    }
-
-    const parsed = schema.safeParse(form);
+    // Client-side validation (UX only — server re-validates everything)
+    const parsed = clientSchema.safeParse(form);
     if (!parsed.success) {
       toast.error(parsed.error.issues[0]?.message ?? "Invalid input");
       return;
     }
+
     setSubmitting(true);
-    const { error } = await supabase.from("contact_messages").insert(parsed.data);
-    setSubmitting(false);
-    if (error) {
+
+    try {
+      const result = await submitContact({
+        data: {
+          name: parsed.data.name,
+          email: parsed.data.email,
+          message: parsed.data.message,
+          // Honeypot — server checks this independently
+          _hp: honeypot,
+          // Timing signal — server validates ≥ 3 seconds elapsed
+          _mountedAt: mountedAt,
+        },
+      });
+
+      if (!result.ok) {
+        toast.error(result.error ?? "Could not send message. Please try again.");
+        return;
+      }
+
+      toast.success("Message sent. We'll be in touch shortly.");
+      setForm({ name: "", email: "", message: "" });
+    } catch (err: unknown) {
+      // Handle rate-limit response (429) from the server function
+      if (err instanceof Response && err.status === 429) {
+        const retryAfter = err.headers.get("Retry-After");
+        const waitMin = retryAfter ? Math.ceil(Number(retryAfter) / 60) : 60;
+        toast.error(`Too many messages sent. Please wait ${waitMin} minute${waitMin !== 1 ? "s" : ""} before trying again.`);
+        return;
+      }
+      // Handle bot-detection block (403)
+      if (err instanceof Response && err.status === 403) {
+        toast.error("Your request was blocked. Please try again later.");
+        return;
+      }
       toast.error("Could not send message. Please try again.");
-      return;
+    } finally {
+      setSubmitting(false);
     }
-    toast.success("Message sent. We'll be in touch shortly.");
-    setForm({ name: "", email: "", message: "" });
   };
 
   return (
@@ -86,8 +102,11 @@ function ContactPage() {
           onSubmit={onSubmit}
           className="rounded-2xl border border-border bg-card p-8 shadow-soft md:p-10"
         >
-          {/* Honeypot field — hidden from real users, bots fill it */}
-          <div aria-hidden="true" style={{ position: "absolute", left: "-9999px", opacity: 0, pointerEvents: "none" }}>
+          {/* Honeypot — hidden from real users via CSS, bots fill it */}
+          <div
+            aria-hidden="true"
+            style={{ position: "absolute", left: "-9999px", opacity: 0, pointerEvents: "none" }}
+          >
             <label htmlFor="website">Website (leave blank)</label>
             <input
               id="website"
@@ -99,6 +118,7 @@ function ContactPage() {
               onChange={(e) => setHoneypot(e.target.value)}
             />
           </div>
+
           <div className="grid gap-5 sm:grid-cols-2">
             <div className="sm:col-span-1">
               <label className="text-sm font-medium" htmlFor="name">Name</label>
@@ -130,12 +150,14 @@ function ContactPage() {
                 value={form.message}
                 onChange={(e) => setForm({ ...form, message: e.target.value })}
                 maxLength={5000}
+                minLength={10}
                 required
                 rows={6}
                 className="mt-1.5 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
               />
             </div>
           </div>
+
           <div className="mt-6 flex items-center justify-between">
             <p className="inline-flex items-center gap-2 text-xs text-muted-foreground">
               <Mail className="h-3.5 w-3.5" /> We'll never share your email.
