@@ -9,8 +9,11 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as TermsRouteImport } from './routes/terms'
+import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as ServicesRouteImport } from './routes/services'
 import { Route as ProjectsRouteImport } from './routes/projects'
+import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as ContactRouteImport } from './routes/contact'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AboutRouteImport } from './routes/about'
@@ -23,6 +26,16 @@ import { Route as AdminLoginRouteImport } from './routes/admin.login'
 import { Route as AdminContentRouteImport } from './routes/admin.content'
 import { Route as AdminAccountRouteImport } from './routes/admin.account'
 
+const TermsRoute = TermsRouteImport.update({
+  id: '/terms',
+  path: '/terms',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
+  id: '/sitemap.xml',
+  path: '/sitemap.xml',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ServicesRoute = ServicesRouteImport.update({
   id: '/services',
   path: '/services',
@@ -31,6 +44,11 @@ const ServicesRoute = ServicesRouteImport.update({
 const ProjectsRoute = ProjectsRouteImport.update({
   id: '/projects',
   path: '/projects',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PrivacyRoute = PrivacyRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ContactRoute = ContactRouteImport.update({
@@ -94,8 +112,11 @@ export interface FileRoutesByFullPath {
   '/about': typeof AboutRoute
   '/admin': typeof AdminRouteWithChildren
   '/contact': typeof ContactRoute
+  '/privacy': typeof PrivacyRoute
   '/projects': typeof ProjectsRoute
   '/services': typeof ServicesRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/terms': typeof TermsRoute
   '/admin/account': typeof AdminAccountRoute
   '/admin/content': typeof AdminContentRoute
   '/admin/login': typeof AdminLoginRoute
@@ -108,8 +129,11 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
   '/contact': typeof ContactRoute
+  '/privacy': typeof PrivacyRoute
   '/projects': typeof ProjectsRoute
   '/services': typeof ServicesRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/terms': typeof TermsRoute
   '/admin/account': typeof AdminAccountRoute
   '/admin/content': typeof AdminContentRoute
   '/admin/login': typeof AdminLoginRoute
@@ -124,8 +148,11 @@ export interface FileRoutesById {
   '/about': typeof AboutRoute
   '/admin': typeof AdminRouteWithChildren
   '/contact': typeof ContactRoute
+  '/privacy': typeof PrivacyRoute
   '/projects': typeof ProjectsRoute
   '/services': typeof ServicesRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/terms': typeof TermsRoute
   '/admin/account': typeof AdminAccountRoute
   '/admin/content': typeof AdminContentRoute
   '/admin/login': typeof AdminLoginRoute
@@ -141,8 +168,11 @@ export interface FileRouteTypes {
     | '/about'
     | '/admin'
     | '/contact'
+    | '/privacy'
     | '/projects'
     | '/services'
+    | '/sitemap.xml'
+    | '/terms'
     | '/admin/account'
     | '/admin/content'
     | '/admin/login'
@@ -155,8 +185,11 @@ export interface FileRouteTypes {
     | '/'
     | '/about'
     | '/contact'
+    | '/privacy'
     | '/projects'
     | '/services'
+    | '/sitemap.xml'
+    | '/terms'
     | '/admin/account'
     | '/admin/content'
     | '/admin/login'
@@ -170,8 +203,11 @@ export interface FileRouteTypes {
     | '/about'
     | '/admin'
     | '/contact'
+    | '/privacy'
     | '/projects'
     | '/services'
+    | '/sitemap.xml'
+    | '/terms'
     | '/admin/account'
     | '/admin/content'
     | '/admin/login'
@@ -186,12 +222,29 @@ export interface RootRouteChildren {
   AboutRoute: typeof AboutRoute
   AdminRoute: typeof AdminRouteWithChildren
   ContactRoute: typeof ContactRoute
+  PrivacyRoute: typeof PrivacyRoute
   ProjectsRoute: typeof ProjectsRoute
   ServicesRoute: typeof ServicesRoute
+  SitemapDotxmlRoute: typeof SitemapDotxmlRoute
+  TermsRoute: typeof TermsRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/terms': {
+      id: '/terms'
+      path: '/terms'
+      fullPath: '/terms'
+      preLoaderRoute: typeof TermsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sitemap.xml': {
+      id: '/sitemap.xml'
+      path: '/sitemap.xml'
+      fullPath: '/sitemap.xml'
+      preLoaderRoute: typeof SitemapDotxmlRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/services': {
       id: '/services'
       path: '/services'
@@ -204,6 +257,13 @@ declare module '@tanstack/react-router' {
       path: '/projects'
       fullPath: '/projects'
       preLoaderRoute: typeof ProjectsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/privacy': {
+      id: '/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof PrivacyRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/contact': {
@@ -313,8 +373,11 @@ const rootRouteChildren: RootRouteChildren = {
   AboutRoute: AboutRoute,
   AdminRoute: AdminRouteWithChildren,
   ContactRoute: ContactRoute,
+  PrivacyRoute: PrivacyRoute,
   ProjectsRoute: ProjectsRoute,
   ServicesRoute: ServicesRoute,
+  SitemapDotxmlRoute: SitemapDotxmlRoute,
+  TermsRoute: TermsRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

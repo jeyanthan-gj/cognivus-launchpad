@@ -1,0 +1,12 @@
+User-agent: *
+Allow: /
+
+# Block admin routes from indexing
+Disallow: /admin
+Disallow: /admin/
+
+# Block legal pages (they shouldn't rank; content is in Privacy Policy / Terms)
+Disallow: /privacy
+Disallow: /terms
+
+Sitemap: https://cognivus.ai/sitemap.xml

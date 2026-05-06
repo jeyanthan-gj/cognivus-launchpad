@@ -1,7 +1,28 @@
 import { Outlet, Link, createRootRoute, HeadContent, Scripts } from "@tanstack/react-router";
 import { Toaster } from "@/components/ui/sonner";
+import { CookieBanner } from "@/components/site/CookieBanner";
 
 import appCss from "../styles.css?url";
+
+const BASE_URL = "https://cognivus.ai";
+
+// ── JSON-LD organisation schema ──────────────────────────────────────────────
+const ORGANISATION_SCHEMA = JSON.stringify({
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  name: "Cognivus",
+  url: BASE_URL,
+  logo: `${BASE_URL}/favicon.png`,
+  description:
+    "Cognivus is an AI-driven technology company building intelligent, scalable solutions for real-world business problems.",
+  contactPoint: {
+    "@type": "ContactPoint",
+    contactType: "customer support",
+    email: "support@cognivus.ai",
+    url: `${BASE_URL}/contact`,
+  },
+  sameAs: [],
+});
 
 function NotFoundComponent() {
   return (
@@ -36,6 +57,7 @@ export const Route = createRootRoute({
         content:
           "Cognivus is an AI-driven technology company building intelligent, scalable solutions for real-world business problems.",
       },
+      { property: "og:site_name", content: "Cognivus" },
       { property: "og:title", content: "Cognivus — The mind behind every solution" },
       {
         property: "og:description",
@@ -43,6 +65,8 @@ export const Route = createRootRoute({
           "AI automation, RAG knowledge assistants, custom chatbots, and workflow intelligence.",
       },
       { property: "og:type", content: "website" },
+      { property: "og:url", content: BASE_URL },
+      { property: "og:image", content: `${BASE_URL}/og-image.png` },
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:title", content: "Cognivus — The mind behind every solution" },
       {
@@ -50,15 +74,25 @@ export const Route = createRootRoute({
         content:
           "AI automation, RAG knowledge assistants, custom chatbots, and workflow intelligence.",
       },
+      { name: "twitter:image", content: `${BASE_URL}/og-image.png` },
+      // Canonical is set per-page; this is the root fallback
+      { tagName: "link", rel: "canonical", href: BASE_URL },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
       { rel: "icon", href: "/favicon.png" },
+      { rel: "sitemap", type: "application/xml", href: "/sitemap.xml" },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       {
         rel: "stylesheet",
         href: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap",
+      },
+    ],
+    scripts: [
+      {
+        type: "application/ld+json",
+        children: ORGANISATION_SCHEMA,
       },
     ],
   }),
@@ -86,6 +120,7 @@ function RootComponent() {
     <>
       <Outlet />
       <Toaster />
+      <CookieBanner />
     </>
   );
 }
