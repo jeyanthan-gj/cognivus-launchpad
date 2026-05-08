@@ -1,7 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { z } from "zod";
-import { Mail, Send } from "lucide-react";
+import { Mail, Send, MessageCircle } from "lucide-react";
+
+const WHATSAPP_NUMBER = "919384019167"; // +91 93840 19167
 import { toast } from "sonner";
 import { SiteLayout } from "@/components/site/SiteLayout";
 import { submitContact } from "@/api_functions/contact.functions";
@@ -94,6 +96,27 @@ function ContactPage() {
           <p className="animate-fade-up animate-delay-200 mt-6 max-w-2xl text-pretty text-lg text-muted-foreground">
             Tell us about your project. We typically respond within one business day.
           </p>
+        </div>
+      </section>
+
+      <section className="mx-auto max-w-3xl px-6 pb-10">
+        <div className="mb-8 flex flex-col gap-3 sm:flex-row">
+          <a
+            href={`mailto:support@cognivus.ai`}
+            className="flex flex-1 items-center gap-3 rounded-xl border border-border bg-card px-5 py-4 text-sm text-muted-foreground shadow-soft transition-colors hover:border-primary/40 hover:text-foreground"
+          >
+            <Mail className="h-5 w-5 shrink-0 text-primary" />
+            <span>support@cognivus.ai</span>
+          </a>
+          <a
+            href={`https://wa.me/${WHATSAPP_NUMBER}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex flex-1 items-center gap-3 rounded-xl border border-border bg-card px-5 py-4 text-sm text-muted-foreground shadow-soft transition-colors hover:border-primary/40 hover:text-foreground"
+          >
+            <MessageCircle className="h-5 w-5 shrink-0 text-[#25D366]" />
+            <span>Chat on WhatsApp</span>
+          </a>
         </div>
       </section>
 
