@@ -34,7 +34,7 @@ function setRateLimit(attempts: number, lockedUntil: number) {
   }
 }
 
-type Status = { state: "checking" } | { state: "ready" } | { state: "no-admin" } | { state: "error" };
+type Status = { state: "checking" } | { state: "ready" } | { state: "no-admin" } | { state: "not-configured" } | { state: "error" };
 
 function AdminLogin() {
   const navigate = useNavigate();
@@ -56,7 +56,13 @@ function AdminLogin() {
   // Check whether any admin account exists
   useEffect(() => {
     void getAdminReady()
-      .then((res) => setStatus(res.ready ? { state: "ready" } : { state: "no-admin" }))
+      .then((res) => {
+        if ((res as { notConfigured?: boolean }).notConfigured) {
+          setStatus({ state: "not-configured" });
+        } else {
+          setStatus(res.ready ? { state: "ready" } : { state: "no-admin" });
+        }
+      })
       .catch(() => setStatus({ state: "error" }));
   }, []);
 
@@ -133,8 +139,13 @@ function AdminLogin() {
       setRateLimit(0, 0);
       void navigate({ to: "/admin" });
 
-    } catch {
-      toast.error("An unexpected error occurred. Please try again.");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "";
+      if (msg.includes("environment variable") || msg.includes("SUPABASE")) {
+        toast.error("Supabase is not configured. Set your .env variables and restart the dev server.");
+      } else {
+        toast.error("An unexpected error occurred. Please try again.");
+      }
       setBusy(false);
     }
   }
@@ -172,10 +183,31 @@ function AdminLogin() {
           </div>
         )}
 
+        {status.state === "not-configured" && (
+          <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm dark:border-amber-800 dark:bg-amber-950">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+            <div>
+              <p className="font-medium text-amber-800 dark:text-amber-200">Supabase not configured</p>
+              <p className="mt-0.5 text-amber-700 dark:text-amber-300">
+                Copy <code className="rounded bg-amber-100 px-1 dark:bg-amber-900">.env.example</code> to{" "}
+                <code className="rounded bg-amber-100 px-1 dark:bg-amber-900">.env</code> and fill in your{" "}
+                <code className="rounded bg-amber-100 px-1 dark:bg-amber-900">VITE_SUPABASE_URL</code>,{" "}
+                <code className="rounded bg-amber-100 px-1 dark:bg-amber-900">VITE_SUPABASE_PUBLISHABLE_KEY</code>, and{" "}
+                <code className="rounded bg-amber-100 px-1 dark:bg-amber-900">SUPABASE_SERVICE_ROLE_KEY</code>.
+              </p>
+            </div>
+          </div>
+        )}
+
         {status.state === "error" && (
           <div className="flex items-start gap-3 rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm">
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
-            <p className="text-destructive">Could not connect. Check your configuration.</p>
+            <div>
+              <p className="font-medium text-destructive">Could not connect to Supabase</p>
+              <p className="mt-0.5 text-destructive/80">
+                Check that your <code className="rounded bg-destructive/10 px-1">.env</code> credentials are correct and the Supabase project is reachable.
+              </p>
+            </div>
           </div>
         )}
 
@@ -188,7 +220,7 @@ function AdminLogin() {
           </div>
         )}
 
-        {(status.state === "ready" || status.state === "no-admin") && (
+        {(status.state === "ready" || status.state === "no-admin" || status.state === "not-configured") && (
           <form
             onSubmit={handleSubmit}
             className="space-y-4 rounded-2xl border border-border bg-card p-6 shadow-soft"
@@ -224,7 +256,7 @@ function AdminLogin() {
             </div>
             <button
               type="submit"
-              disabled={busy || isLocked || status.state !== "ready"}
+              disabled={busy || isLocked || status.state === "checking"}
               className="w-full rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground shadow-soft hover:shadow-elegant disabled:opacity-60"
             >
               {busy ? (

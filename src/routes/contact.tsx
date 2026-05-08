@@ -64,8 +64,15 @@ function ContactPage() {
         return;
       }
 
-      toast.success("Message sent. We'll be in touch shortly.");
+      toast.success("Redirecting you to WhatsApp…");
       setForm({ name: "", email: "", message: "" });
+
+      // Build WhatsApp deep-link with the message pre-filled so the user can
+      // send it directly. Format: name, email, then the original message body.
+      const waText = encodeURIComponent(
+        `Hi, I'm ${parsed.data.name} (${parsed.data.email}).\n\n${parsed.data.message}`
+      );
+      window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${waText}`, "_blank", "noopener,noreferrer");
     } catch (err: unknown) {
       // Handle rate-limit response (429) from the server function
       if (err instanceof Response && err.status === 429) {

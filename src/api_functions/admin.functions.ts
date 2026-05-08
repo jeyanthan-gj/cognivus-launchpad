@@ -7,10 +7,7 @@ import { requireGeneralApiLimit } from "@/middleware/abuse-protection";
 import { checkRateLimit, extractIp } from "@/lib/rate-limiter";
 import { scoreRequest, shouldBlock, abuseResponse, BotRisk } from "@/lib/bot-detection";
 import { log } from "@/lib/logger";
-import { validateServerEnv } from "@/lib/env";
 import { getRequest } from "@tanstack/react-start/server";
-
-validateServerEnv();
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const PASSWORD_MIN_LENGTH = 12;
@@ -57,6 +54,13 @@ const db = supabaseAdmin as any;
 export const getAdminReady = createServerFn({ method: "GET" })
   .middleware([requireGeneralApiLimit])
   .handler(async () => {
+    // Check env vars are present before attempting DB connection
+    const supabaseUrl = process.env.VITE_SUPABASE_URL ?? process.env.SUPABASE_URL;
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!supabaseUrl || !serviceKey) {
+      return { ready: false, notConfigured: true };
+    }
+
     try {
       const { data: roles, error } = await supabaseAdmin
         .from("user_roles")
@@ -66,12 +70,12 @@ export const getAdminReady = createServerFn({ method: "GET" })
 
       if (error) {
         log.apiError("getAdminReady", error);
-        return { ready: false };
+        return { ready: false, notConfigured: false };
       }
-      return { ready: (roles?.length ?? 0) > 0 };
+      return { ready: (roles?.length ?? 0) > 0, notConfigured: false };
     } catch (err) {
       log.apiError("getAdminReady", err);
-      return { ready: false };
+      return { ready: false, notConfigured: false };
     }
   });
 
