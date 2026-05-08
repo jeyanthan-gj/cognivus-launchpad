@@ -109,13 +109,6 @@ function ContactPage() {
             <span>cognivus88@gmail.com</span>
           </a>
           <a
-            href={`mailto:support@cognivus.ai`}
-            className="flex flex-1 items-center gap-3 rounded-xl border border-border bg-card px-5 py-4 text-sm text-muted-foreground shadow-soft transition-colors hover:border-primary/40 hover:text-foreground"
-          >
-            <Mail className="h-5 w-5 shrink-0 text-primary" />
-            <span>support@cognivus.ai</span>
-          </a>
-          <a
             href={`https://wa.me/${WHATSAPP_NUMBER}`}
             target="_blank"
             rel="noopener noreferrer"

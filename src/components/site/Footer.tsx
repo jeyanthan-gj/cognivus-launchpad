@@ -1,10 +1,8 @@
 import { Link } from "@tanstack/react-router";
 import logoPart1 from "@/assets/logo-part1.jpg";
 import logoPart2 from "@/assets/logo-part2.jpg";
-import { Mail, Bug } from "lucide-react";
+import { Mail } from "lucide-react";
 
-const SUPPORT_EMAIL = "support@cognivus.ai";
-const BUG_EMAIL = "bugs@cognivus.ai";
 const GENERAL_EMAIL = "cognivus88@gmail.com";
 
 const WHATSAPP_NUMBER = "919384019167"; // +91 93840 19167 — digits only for wa.me
@@ -122,26 +120,13 @@ export function Footer() {
             </li>
             <li>
               <a
-                href={`mailto:${SUPPORT_EMAIL}`}
-                className="inline-flex items-center gap-1.5 hover:text-foreground"
+                href={`https://wa.me/${WHATSAPP_NUMBER}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-foreground"
               >
-                <Mail className="h-3.5 w-3.5" />
-                {SUPPORT_EMAIL}
-              </a>
-            </li>
-            <li>
-              <a
-                href={`mailto:${BUG_EMAIL}`}
-                className="inline-flex items-center gap-1.5 hover:text-foreground"
-              >
-                <Bug className="h-3.5 w-3.5" />
-                Report a bug
-              </a>
-            </li>
-            <li>
-              <Link to="/contact" className="hover:text-foreground">
                 Send a message →
-              </Link>
+              </a>
             </li>
           </ul>
         </div>
@@ -163,7 +148,7 @@ export function Footer() {
           <div className="flex items-center gap-4">
             <Link to="/privacy" className="hover:text-foreground">Privacy</Link>
             <Link to="/terms"   className="hover:text-foreground">Terms</Link>
-            <a href={`mailto:${SUPPORT_EMAIL}`} className="hover:text-foreground">Support</a>
+            <a href={`https://wa.me/${WHATSAPP_NUMBER}`} target="_blank" rel="noopener noreferrer" className="hover:text-foreground">Support</a>
           </div>
         </div>
       </div>
