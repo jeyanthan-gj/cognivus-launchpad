@@ -102,6 +102,13 @@ function ContactPage() {
       <section className="mx-auto max-w-3xl px-6 pb-10">
         <div className="mb-8 flex flex-col gap-3 sm:flex-row">
           <a
+            href={`mailto:cognivus88@gmail.com`}
+            className="flex flex-1 items-center gap-3 rounded-xl border border-border bg-card px-5 py-4 text-sm text-muted-foreground shadow-soft transition-colors hover:border-primary/40 hover:text-foreground"
+          >
+            <Mail className="h-5 w-5 shrink-0 text-primary" />
+            <span>cognivus88@gmail.com</span>
+          </a>
+          <a
             href={`mailto:support@cognivus.ai`}
             className="flex flex-1 items-center gap-3 rounded-xl border border-border bg-card px-5 py-4 text-sm text-muted-foreground shadow-soft transition-colors hover:border-primary/40 hover:text-foreground"
           >

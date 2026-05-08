@@ -5,6 +5,7 @@ import { Mail, Bug } from "lucide-react";
 
 const SUPPORT_EMAIL = "support@cognivus.ai";
 const BUG_EMAIL = "bugs@cognivus.ai";
+const GENERAL_EMAIL = "cognivus88@gmail.com";
 
 const WHATSAPP_NUMBER = "919384019167"; // +91 93840 19167 — digits only for wa.me
 
@@ -110,6 +111,15 @@ export function Footer() {
         <div>
           <h4 className="text-sm font-semibold">Support</h4>
           <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
+            <li>
+              <a
+                href={`mailto:${GENERAL_EMAIL}`}
+                className="inline-flex items-center gap-1.5 hover:text-foreground"
+              >
+                <Mail className="h-3.5 w-3.5" />
+                {GENERAL_EMAIL}
+              </a>
+            </li>
             <li>
               <a
                 href={`mailto:${SUPPORT_EMAIL}`}
