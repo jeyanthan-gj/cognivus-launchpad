@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
-import { ArrowRight, Workflow, BookOpen, MessageSquare, Cog, Sparkles } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { ArrowRight, Workflow, BookOpen, MessageSquare, Cog, Sparkles, ExternalLink, X, Play } from "lucide-react";
 import { SiteLayout } from "@/components/site/SiteLayout";
 import { ServiceIcon } from "@/components/site/icon";
 import { supabase } from "@/integrations/supabase/client";
@@ -26,13 +26,143 @@ export const Route = createFileRoute("/")({
 });
 
 type Service = { id: string; icon: string; title: string; description: string };
-type Project = { id: string; title: string; description: string; tech_stack: string[]; demo_url: string | null };
+type Project = {
+  id: string;
+  title: string;
+  description: string;
+  tech_stack: string[];
+  demo_url: string | null;
+  thumbnail_url: string | null;
+  video_url: string | null;
+};
 type Content = Record<string, string>;
+
+// ─── Home Project Card ────────────────────────────────────────────────────────
+function HomeProjectCard({ project, onClick }: { project: Project; onClick: () => void }) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [videoReady, setVideoReady] = useState(false);
+  const [hovered, setHovered] = useState(false);
+
+  const handleMouseEnter = () => {
+    setHovered(true);
+    if (videoRef.current && project.video_url) videoRef.current.play().catch(() => {});
+  };
+  const handleMouseLeave = () => {
+    setHovered(false);
+    if (videoRef.current) { videoRef.current.pause(); videoRef.current.currentTime = 0; }
+  };
+
+  return (
+    <article
+      onClick={onClick}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+      className="group cursor-pointer rounded-2xl border border-border bg-card shadow-soft transition-all duration-300 hover:-translate-y-1 hover:shadow-elegant overflow-hidden"
+    >
+      <div className="relative aspect-video overflow-hidden bg-muted">
+        {project.thumbnail_url ? (
+          <img
+            src={project.thumbnail_url}
+            alt={project.title}
+            className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-500 ${hovered && videoReady && project.video_url ? "opacity-0" : "opacity-100"}`}
+          />
+        ) : (
+          <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-primary/10 to-primary-glow/10">
+            <span className="text-3xl font-bold text-primary/20 select-none">{project.title.slice(0, 2).toUpperCase()}</span>
+          </div>
+        )}
+        {project.video_url && (
+          <video
+            ref={videoRef}
+            src={project.video_url}
+            muted loop playsInline preload="metadata"
+            onCanPlay={() => setVideoReady(true)}
+            className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-500 ${hovered && videoReady ? "opacity-100" : "opacity-0"}`}
+          />
+        )}
+        {project.video_url && !hovered && (
+          <div className="absolute bottom-3 right-3 flex items-center gap-1 rounded-full bg-foreground/70 px-2 py-0.5 text-xs font-medium text-background backdrop-blur-sm">
+            <Play className="h-2.5 w-2.5 fill-current" /> Preview
+          </div>
+        )}
+        <div className="absolute inset-0 bg-gradient-to-t from-foreground/30 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+        <div className="absolute inset-0 flex items-center justify-center opacity-0 transition-opacity duration-300 group-hover:opacity-100">
+          <span className="rounded-full border border-background/60 bg-background/20 px-4 py-2 text-sm font-semibold text-background backdrop-blur-sm">View project</span>
+        </div>
+      </div>
+      <div className="p-5">
+        <h3 className="font-semibold group-hover:text-primary-glow transition-colors">{project.title}</h3>
+        <p className="mt-1.5 line-clamp-2 text-sm text-muted-foreground">{project.description}</p>
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          {project.tech_stack.slice(0, 4).map((t) => (
+            <span key={t} className="rounded-md bg-accent px-2 py-0.5 text-xs text-accent-foreground">{t}</span>
+          ))}
+        </div>
+      </div>
+    </article>
+  );
+}
+
+// ─── Home Project Modal ────────────────────────────────────────────────────────
+function HomeProjectModal({ project, onClose }: { project: Project; onClose: () => void }) {
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", h);
+    document.body.style.overflow = "hidden";
+    return () => { document.removeEventListener("keydown", h); document.body.style.overflow = ""; };
+  }, [onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 md:p-8 bg-foreground/60 backdrop-blur-sm"
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <div className="relative flex w-full max-w-4xl flex-col rounded-2xl border border-border bg-card shadow-elegant overflow-hidden max-h-[90vh]">
+        <button onClick={onClose} aria-label="Close" className="absolute right-4 top-4 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-background/80 backdrop-blur-sm border border-border hover:bg-accent transition-colors">
+          <X className="h-4 w-4" />
+        </button>
+        <div className="relative aspect-video w-full shrink-0 bg-muted overflow-hidden">
+          {project.thumbnail_url && !project.video_url && (
+            <img src={project.thumbnail_url} alt={project.title} className="absolute inset-0 h-full w-full object-cover" />
+          )}
+          {project.video_url && (
+            <video src={project.video_url} autoPlay muted loop playsInline controls poster={project.thumbnail_url ?? undefined} className="absolute inset-0 h-full w-full object-cover" />
+          )}
+          {!project.thumbnail_url && !project.video_url && (
+            <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-primary/10 to-primary-glow/10">
+              <span className="text-6xl font-bold text-primary/20 select-none">{project.title.slice(0, 2).toUpperCase()}</span>
+            </div>
+          )}
+        </div>
+        <div className="overflow-y-auto p-6 md:p-8">
+          <h2 className="text-2xl font-bold tracking-tight">{project.title}</h2>
+          <p className="mt-3 text-base leading-relaxed text-muted-foreground">{project.description}</p>
+          <div className="mt-5">
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Tech Stack</p>
+            <div className="flex flex-wrap gap-2">
+              {project.tech_stack.map((t) => (
+                <span key={t} className="rounded-lg border border-border bg-accent px-3 py-1 text-sm font-medium text-accent-foreground">{t}</span>
+              ))}
+            </div>
+          </div>
+          {project.demo_url && (
+            <div className="mt-6">
+              <a href={project.demo_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-soft hover:shadow-elegant transition-shadow">
+                View live demo <ExternalLink className="h-4 w-4" />
+              </a>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function HomePage() {
   const [services, setServices] = useState<Service[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [content, setContent] = useState<Content>({});
+  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
 
   useEffect(() => {
     void (async () => {
@@ -40,7 +170,7 @@ function HomePage() {
         supabase.from("services").select("id,icon,title,description").order("display_order"),
         supabase
           .from("projects")
-          .select("id,title,description,tech_stack,demo_url")
+          .select("id,title,description,tech_stack,demo_url,thumbnail_url,video_url")
           .eq("published", true)
           .order("display_order")
           .limit(3),
@@ -145,21 +275,15 @@ function HomePage() {
           </div>
           <div className="mt-10 grid gap-6 md:grid-cols-3">
             {projects.map((p) => (
-              <article key={p.id} className="rounded-xl border border-border bg-card p-6 shadow-soft">
-                <h3 className="font-semibold">{p.title}</h3>
-                <p className="mt-2 text-sm text-muted-foreground">{p.description}</p>
-                <div className="mt-4 flex flex-wrap gap-1.5">
-                  {p.tech_stack.slice(0, 4).map((t) => (
-                    <span key={t} className="rounded-md bg-accent px-2 py-0.5 text-xs text-accent-foreground">
-                      {t}
-                    </span>
-                  ))}
-                </div>
-              </article>
+              <HomeProjectCard key={p.id} project={p} onClick={() => setSelectedProject(p)} />
             ))}
           </div>
         </div>
       </section>
+
+      {selectedProject && (
+        <HomeProjectModal project={selectedProject} onClose={() => setSelectedProject(null)} />
+      )}
 
       {/* CTA */}
       <section className="mx-auto max-w-6xl px-6 py-24">

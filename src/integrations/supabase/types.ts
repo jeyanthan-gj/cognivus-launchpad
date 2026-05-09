@@ -47,6 +47,8 @@ export type Database = {
           id: string
           published: boolean
           tech_stack: string[]
+          thumbnail_url: string | null
+          video_url: string | null
           title: string
           updated_at: string
         }
@@ -58,6 +60,8 @@ export type Database = {
           id?: string
           published?: boolean
           tech_stack?: string[]
+          thumbnail_url?: string | null
+          video_url?: string | null
           title: string
           updated_at?: string
         }
@@ -69,6 +73,8 @@ export type Database = {
           id?: string
           published?: boolean
           tech_stack?: string[]
+          thumbnail_url?: string | null
+          video_url?: string | null
           title?: string
           updated_at?: string
         }
