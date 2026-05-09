@@ -14,6 +14,29 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
+// ─── YouTube helpers ───────────────────────────────────────────────────────────
+function getYouTubeId(url: string): string | null {
+  const match = url.match(
+    /(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/
+  );
+  return match ? match[1] : null;
+}
+
+function getYouTubeEmbedUrl(url: string, autoplay = false): string {
+  const id = getYouTubeId(url);
+  if (!id) return url;
+  const params = new URLSearchParams({
+    autoplay: autoplay ? "1" : "0",
+    mute: "1",
+    loop: "1",
+    playlist: id,
+    controls: "1",
+    rel: "0",
+    modestbranding: "1",
+  });
+  return `https://www.youtube.com/embed/${id}?${params.toString()}`;
+}
+
 export const Route = createFileRoute("/admin/projects")({
   head: () => ({ meta: [{ title: "Projects — Cognivus Admin" }] }),
   component: AdminProjects,
@@ -280,16 +303,26 @@ function AdminProjects() {
                   placeholder="https://..."
                   className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                 />
-                {form.video_url && (
-                  <video
-                    src={form.video_url}
-                    muted
-                    loop
-                    playsInline
-                    controls
-                    className="mt-2 h-24 w-full rounded-md object-cover border border-border"
-                  />
-                )}
+                {form.video_url && (() => {
+                  const isYT = !!getYouTubeId(form.video_url);
+                  return isYT ? (
+                    <iframe
+                      src={getYouTubeEmbedUrl(form.video_url, false)}
+                      allow="encrypted-media"
+                      allowFullScreen
+                      className="mt-2 h-36 w-full rounded-md border border-border"
+                    />
+                  ) : (
+                    <video
+                      src={form.video_url}
+                      muted
+                      loop
+                      playsInline
+                      controls
+                      className="mt-2 h-24 w-full rounded-md object-cover border border-border"
+                    />
+                  );
+                })()}
               </div>
 
               {/* Demo URL */}

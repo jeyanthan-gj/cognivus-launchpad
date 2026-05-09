@@ -30,22 +30,47 @@ type Project = {
   video_url: string | null;
 };
 
+// ─── YouTube helpers ───────────────────────────────────────────────────────────
+function getYouTubeId(url: string): string | null {
+  const match = url.match(
+    /(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/
+  );
+  return match ? match[1] : null;
+}
+
+function getYouTubeEmbedUrl(url: string, autoplay = false): string {
+  const id = getYouTubeId(url);
+  if (!id) return url;
+  const params = new URLSearchParams({
+    autoplay: autoplay ? "1" : "0",
+    mute: "1",
+    loop: "1",
+    playlist: id, // required for loop to work
+    controls: "1",
+    rel: "0",
+    modestbranding: "1",
+  });
+  return `https://www.youtube.com/embed/${id}?${params.toString()}`;
+}
+
 // ─── Project Card ─────────────────────────────────────────────────────────────
 function ProjectCard({ project, onClick }: { project: Project; onClick: () => void }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [videoReady, setVideoReady] = useState(false);
   const [hovered, setHovered] = useState(false);
 
+  const isYouTube = !!project.video_url && !!getYouTubeId(project.video_url);
+
   const handleMouseEnter = () => {
     setHovered(true);
-    if (videoRef.current && project.video_url) {
+    if (videoRef.current && project.video_url && !isYouTube) {
       videoRef.current.play().catch(() => {});
     }
   };
 
   const handleMouseLeave = () => {
     setHovered(false);
-    if (videoRef.current) {
+    if (videoRef.current && !isYouTube) {
       videoRef.current.pause();
       videoRef.current.currentTime = 0;
     }
@@ -65,7 +90,7 @@ function ProjectCard({ project, onClick }: { project: Project; onClick: () => vo
             src={project.thumbnail_url}
             alt={project.title}
             className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-500 ${
-              hovered && videoReady && project.video_url ? "opacity-0" : "opacity-100"
+              hovered && (isYouTube || videoReady) && project.video_url ? "opacity-0" : "opacity-100"
             }`}
           />
         ) : (
@@ -76,7 +101,20 @@ function ProjectCard({ project, onClick }: { project: Project; onClick: () => vo
           </div>
         )}
 
-        {project.video_url && (
+        {/* YouTube embed on hover */}
+        {project.video_url && isYouTube && (
+          <iframe
+            src={hovered ? getYouTubeEmbedUrl(project.video_url, true) : undefined}
+            allow="autoplay; encrypted-media"
+            allowFullScreen
+            className={`absolute inset-0 h-full w-full transition-opacity duration-500 ${
+              hovered ? "opacity-100" : "opacity-0"
+            }`}
+          />
+        )}
+
+        {/* Regular video on hover */}
+        {project.video_url && !isYouTube && (
           <video
             ref={videoRef}
             src={project.video_url}
@@ -164,18 +202,28 @@ function ProjectModal({ project, onClose }: { project: Project; onClose: () => v
               className="absolute inset-0 h-full w-full object-cover"
             />
           )}
-          {project.video_url && (
-            <video
-              src={project.video_url}
-              autoPlay
-              muted
-              loop
-              playsInline
-              controls
-              poster={project.thumbnail_url ?? undefined}
-              className="absolute inset-0 h-full w-full object-cover"
-            />
-          )}
+          {project.video_url && (() => {
+            const isYT = !!getYouTubeId(project.video_url);
+            return isYT ? (
+              <iframe
+                src={getYouTubeEmbedUrl(project.video_url, true)}
+                allow="autoplay; encrypted-media; fullscreen"
+                allowFullScreen
+                className="absolute inset-0 h-full w-full"
+              />
+            ) : (
+              <video
+                src={project.video_url}
+                autoPlay
+                muted
+                loop
+                playsInline
+                controls
+                poster={project.thumbnail_url ?? undefined}
+                className="absolute inset-0 h-full w-full object-cover"
+              />
+            );
+          })()}
           {!project.thumbnail_url && !project.video_url && (
             <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-primary/10 to-primary-glow/10">
               <span className="text-6xl font-bold tracking-tight text-primary/20 select-none">
