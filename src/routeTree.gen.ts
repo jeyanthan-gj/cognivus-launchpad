@@ -13,6 +13,7 @@ import { Route as TermsRouteImport } from './routes/terms'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as ServicesRouteImport } from './routes/services'
 import { Route as ProjectsRouteImport } from './routes/projects'
+import { Route as ProjectsIdRouteImport } from './routes/projects.$id'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as ContactRouteImport } from './routes/contact'
 import { Route as AdminRouteImport } from './routes/admin'
@@ -45,6 +46,11 @@ const ProjectsRoute = ProjectsRouteImport.update({
   id: '/projects',
   path: '/projects',
   getParentRoute: () => rootRouteImport,
+} as any)
+const ProjectsIdRoute = ProjectsIdRouteImport.update({
+  id: '/projects/$id',
+  path: '/$id',
+  getParentRoute: () => ProjectsRoute,
 } as any)
 const PrivacyRoute = PrivacyRouteImport.update({
   id: '/privacy',
@@ -113,7 +119,8 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AdminRouteWithChildren
   '/contact': typeof ContactRoute
   '/privacy': typeof PrivacyRoute
-  '/projects': typeof ProjectsRoute
+  '/projects': typeof ProjectsRouteWithChildren
+  '/projects/$id': typeof ProjectsIdRoute
   '/services': typeof ServicesRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/terms': typeof TermsRoute
@@ -130,7 +137,8 @@ export interface FileRoutesByTo {
   '/about': typeof AboutRoute
   '/contact': typeof ContactRoute
   '/privacy': typeof PrivacyRoute
-  '/projects': typeof ProjectsRoute
+  '/projects': typeof ProjectsRouteWithChildren
+  '/projects/$id': typeof ProjectsIdRoute
   '/services': typeof ServicesRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/terms': typeof TermsRoute
@@ -149,7 +157,8 @@ export interface FileRoutesById {
   '/admin': typeof AdminRouteWithChildren
   '/contact': typeof ContactRoute
   '/privacy': typeof PrivacyRoute
-  '/projects': typeof ProjectsRoute
+  '/projects': typeof ProjectsRouteWithChildren
+  '/projects/$id': typeof ProjectsIdRoute
   '/services': typeof ServicesRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/terms': typeof TermsRoute
@@ -170,6 +179,7 @@ export interface FileRouteTypes {
     | '/contact'
     | '/privacy'
     | '/projects'
+    | '/projects/$id'
     | '/services'
     | '/sitemap.xml'
     | '/terms'
@@ -187,6 +197,7 @@ export interface FileRouteTypes {
     | '/contact'
     | '/privacy'
     | '/projects'
+    | '/projects/$id'
     | '/services'
     | '/sitemap.xml'
     | '/terms'
@@ -205,6 +216,7 @@ export interface FileRouteTypes {
     | '/contact'
     | '/privacy'
     | '/projects'
+    | '/projects/$id'
     | '/services'
     | '/sitemap.xml'
     | '/terms'
@@ -217,13 +229,23 @@ export interface FileRouteTypes {
     | '/admin/'
   fileRoutesById: FileRoutesById
 }
+interface ProjectsRouteChildren {
+  ProjectsIdRoute: typeof ProjectsIdRoute
+}
+
+const ProjectsRouteChildren: ProjectsRouteChildren = {
+  ProjectsIdRoute: ProjectsIdRoute,
+}
+
+const ProjectsRouteWithChildren = ProjectsRoute._addFileChildren(ProjectsRouteChildren)
+
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AboutRoute: typeof AboutRoute
   AdminRoute: typeof AdminRouteWithChildren
   ContactRoute: typeof ContactRoute
   PrivacyRoute: typeof PrivacyRoute
-  ProjectsRoute: typeof ProjectsRoute
+  ProjectsRoute: typeof ProjectsRouteWithChildren
   ServicesRoute: typeof ServicesRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   TermsRoute: typeof TermsRoute
@@ -258,6 +280,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/projects'
       preLoaderRoute: typeof ProjectsRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/projects/$id': {
+      id: '/projects/$id'
+      path: '/$id'
+      fullPath: '/projects/$id'
+      preLoaderRoute: typeof ProjectsIdRouteImport
+      parentRoute: typeof ProjectsRoute
     }
     '/privacy': {
       id: '/privacy'
@@ -374,7 +403,7 @@ const rootRouteChildren: RootRouteChildren = {
   AdminRoute: AdminRouteWithChildren,
   ContactRoute: ContactRoute,
   PrivacyRoute: PrivacyRoute,
-  ProjectsRoute: ProjectsRoute,
+  ProjectsRoute: ProjectsRouteWithChildren,
   ServicesRoute: ServicesRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   TermsRoute: TermsRoute,
