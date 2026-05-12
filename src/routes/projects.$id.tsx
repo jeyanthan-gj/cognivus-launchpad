@@ -130,7 +130,7 @@ function ProjectDetailPage() {
             <img
               src={project.thumbnail_url}
               alt={project.title}
-              className="absolute inset-0 h-full w-full object-cover"
+              className="absolute inset-0 h-full w-full object-contain"
             />
           ) : (
             <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-primary/10 to-primary-glow/10">
