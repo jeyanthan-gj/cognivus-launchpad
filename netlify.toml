@@ -60,7 +60,7 @@
     Cross-Origin-Embedder-Policy = "require-corp"
 
     # ── Content Security Policy ───────────────────────────────────────────────
-    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://*.supabase.co; connect-src 'self' https://*.supabase.co wss://*.supabase.co; frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests;"
+    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://*.supabase.co; connect-src 'self' https://*.supabase.co wss://*.supabase.co; frame-src https://www.youtube.com https://youtube.com; frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests;"
 
     # ── Rate-limit headers ────────────────────────────────────────────────────
     # Expose X-RateLimit-* and Retry-After so legitimate clients can implement
@@ -90,3 +90,9 @@
     Access-Control-Allow-Headers = "Content-Type, Authorization"
     Access-Control-Max-Age       = "86400"
     Access-Control-Expose-Headers = "X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Window, X-RateLimit-Reset, Retry-After"
+
+# ── SPA fallback — all unmatched paths serve index.html ──────────────────────
+[[redirects]]
+  from   = "/*"
+  to     = "/index.html"
+  status = 200
