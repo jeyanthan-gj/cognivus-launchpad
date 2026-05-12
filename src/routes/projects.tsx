@@ -108,7 +108,7 @@ function ProjectCard({ project }: { project: Project }) {
             src={hovered ? getYouTubeEmbedUrl(project.video_url, true) : undefined}
             allow="autoplay; encrypted-media"
             allowFullScreen
-            className={`absolute inset-0 h-full w-full transition-opacity duration-500 ${
+            className={`absolute inset-0 h-full w-full pointer-events-none transition-opacity duration-500 ${
               hovered ? "opacity-100" : "opacity-0"
             }`}
           />
