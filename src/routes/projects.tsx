@@ -1,5 +1,5 @@
 // build: 1778547053
-import { createFileRoute, useNavigate, Outlet, useMatch } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { Play } from "lucide-react";
 import { SiteLayout } from "@/components/site/SiteLayout";
@@ -174,9 +174,6 @@ function ProjectsPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Check if we're on a child route (e.g. /projects/$id)
-  const isOnChildRoute = !useMatch({ from: "/projects", shouldThrow: false });
-
   useEffect(() => {
     void (async () => {
       const { data } = await supabase
@@ -188,11 +185,6 @@ function ProjectsPage() {
       setLoading(false);
     })();
   }, []);
-
-  // If navigated to a child route like /projects/$id, render that child
-  if (isOnChildRoute) {
-    return <Outlet />;
-  }
 
   return (
     <SiteLayout>
