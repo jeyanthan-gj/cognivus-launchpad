@@ -1,3 +1,4 @@
+// build: 1778547053
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { ArrowRight, Workflow, BookOpen, MessageSquare, Cog, Sparkles, Play } from "lucide-react";

@@ -1,3 +1,4 @@
+// build: 1778547053
 /* eslint-disable */
 
 // @ts-nocheck
@@ -13,13 +14,13 @@ import { Route as TermsRouteImport } from './routes/terms'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as ServicesRouteImport } from './routes/services'
 import { Route as ProjectsRouteImport } from './routes/projects'
-import { Route as ProjectsIdRouteImport } from './routes/projects.$id'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as ContactRouteImport } from './routes/contact'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AboutRouteImport } from './routes/about'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
+import { Route as ProjectsIdRouteImport } from './routes/projects.$id'
 import { Route as AdminServicesRouteImport } from './routes/admin.services'
 import { Route as AdminProjectsRouteImport } from './routes/admin.projects'
 import { Route as AdminMessagesRouteImport } from './routes/admin.messages'
@@ -46,11 +47,6 @@ const ProjectsRoute = ProjectsRouteImport.update({
   id: '/projects',
   path: '/projects',
   getParentRoute: () => rootRouteImport,
-} as any)
-const ProjectsIdRoute = ProjectsIdRouteImport.update({
-  id: '/projects/$id',
-  path: '/$id',
-  getParentRoute: () => ProjectsRoute,
 } as any)
 const PrivacyRoute = PrivacyRouteImport.update({
   id: '/privacy',
@@ -81,6 +77,11 @@ const AdminIndexRoute = AdminIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => AdminRoute,
+} as any)
+const ProjectsIdRoute = ProjectsIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => ProjectsRoute,
 } as any)
 const AdminServicesRoute = AdminServicesRouteImport.update({
   id: '/services',
@@ -120,7 +121,6 @@ export interface FileRoutesByFullPath {
   '/contact': typeof ContactRoute
   '/privacy': typeof PrivacyRoute
   '/projects': typeof ProjectsRouteWithChildren
-  '/projects/$id': typeof ProjectsIdRoute
   '/services': typeof ServicesRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/terms': typeof TermsRoute
@@ -130,6 +130,7 @@ export interface FileRoutesByFullPath {
   '/admin/messages': typeof AdminMessagesRoute
   '/admin/projects': typeof AdminProjectsRoute
   '/admin/services': typeof AdminServicesRoute
+  '/projects/$id': typeof ProjectsIdRoute
   '/admin/': typeof AdminIndexRoute
 }
 export interface FileRoutesByTo {
@@ -138,7 +139,6 @@ export interface FileRoutesByTo {
   '/contact': typeof ContactRoute
   '/privacy': typeof PrivacyRoute
   '/projects': typeof ProjectsRouteWithChildren
-  '/projects/$id': typeof ProjectsIdRoute
   '/services': typeof ServicesRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/terms': typeof TermsRoute
@@ -148,6 +148,7 @@ export interface FileRoutesByTo {
   '/admin/messages': typeof AdminMessagesRoute
   '/admin/projects': typeof AdminProjectsRoute
   '/admin/services': typeof AdminServicesRoute
+  '/projects/$id': typeof ProjectsIdRoute
   '/admin': typeof AdminIndexRoute
 }
 export interface FileRoutesById {
@@ -158,7 +159,6 @@ export interface FileRoutesById {
   '/contact': typeof ContactRoute
   '/privacy': typeof PrivacyRoute
   '/projects': typeof ProjectsRouteWithChildren
-  '/projects/$id': typeof ProjectsIdRoute
   '/services': typeof ServicesRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/terms': typeof TermsRoute
@@ -168,6 +168,7 @@ export interface FileRoutesById {
   '/admin/messages': typeof AdminMessagesRoute
   '/admin/projects': typeof AdminProjectsRoute
   '/admin/services': typeof AdminServicesRoute
+  '/projects/$id': typeof ProjectsIdRoute
   '/admin/': typeof AdminIndexRoute
 }
 export interface FileRouteTypes {
@@ -179,7 +180,6 @@ export interface FileRouteTypes {
     | '/contact'
     | '/privacy'
     | '/projects'
-    | '/projects/$id'
     | '/services'
     | '/sitemap.xml'
     | '/terms'
@@ -189,6 +189,7 @@ export interface FileRouteTypes {
     | '/admin/messages'
     | '/admin/projects'
     | '/admin/services'
+    | '/projects/$id'
     | '/admin/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -197,7 +198,6 @@ export interface FileRouteTypes {
     | '/contact'
     | '/privacy'
     | '/projects'
-    | '/projects/$id'
     | '/services'
     | '/sitemap.xml'
     | '/terms'
@@ -207,6 +207,7 @@ export interface FileRouteTypes {
     | '/admin/messages'
     | '/admin/projects'
     | '/admin/services'
+    | '/projects/$id'
     | '/admin'
   id:
     | '__root__'
@@ -216,7 +217,6 @@ export interface FileRouteTypes {
     | '/contact'
     | '/privacy'
     | '/projects'
-    | '/projects/$id'
     | '/services'
     | '/sitemap.xml'
     | '/terms'
@@ -226,19 +226,10 @@ export interface FileRouteTypes {
     | '/admin/messages'
     | '/admin/projects'
     | '/admin/services'
+    | '/projects/$id'
     | '/admin/'
   fileRoutesById: FileRoutesById
 }
-interface ProjectsRouteChildren {
-  ProjectsIdRoute: typeof ProjectsIdRoute
-}
-
-const ProjectsRouteChildren: ProjectsRouteChildren = {
-  ProjectsIdRoute: ProjectsIdRoute,
-}
-
-const ProjectsRouteWithChildren = ProjectsRoute._addFileChildren(ProjectsRouteChildren)
-
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AboutRoute: typeof AboutRoute
@@ -281,13 +272,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProjectsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/projects/$id': {
-      id: '/projects/$id'
-      path: '/$id'
-      fullPath: '/projects/$id'
-      preLoaderRoute: typeof ProjectsIdRouteImport
-      parentRoute: typeof ProjectsRoute
-    }
     '/privacy': {
       id: '/privacy'
       path: '/privacy'
@@ -329,6 +313,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/admin/'
       preLoaderRoute: typeof AdminIndexRouteImport
       parentRoute: typeof AdminRoute
+    }
+    '/projects/$id': {
+      id: '/projects/$id'
+      path: '/$id'
+      fullPath: '/projects/$id'
+      preLoaderRoute: typeof ProjectsIdRouteImport
+      parentRoute: typeof ProjectsRoute
     }
     '/admin/services': {
       id: '/admin/services'
@@ -396,6 +387,18 @@ const AdminRouteChildren: AdminRouteChildren = {
 }
 
 const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
+
+interface ProjectsRouteChildren {
+  ProjectsIdRoute: typeof ProjectsIdRoute
+}
+
+const ProjectsRouteChildren: ProjectsRouteChildren = {
+  ProjectsIdRoute: ProjectsIdRoute,
+}
+
+const ProjectsRouteWithChildren = ProjectsRoute._addFileChildren(
+  ProjectsRouteChildren,
+)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
