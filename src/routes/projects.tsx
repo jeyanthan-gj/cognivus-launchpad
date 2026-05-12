@@ -1,6 +1,6 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { ExternalLink, X, Play } from "lucide-react";
+import { Play } from "lucide-react";
 import { SiteLayout } from "@/components/site/SiteLayout";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -54,7 +54,8 @@ function getYouTubeEmbedUrl(url: string, autoplay = false): string {
 }
 
 // ─── Project Card ─────────────────────────────────────────────────────────────
-function ProjectCard({ project, onClick }: { project: Project; onClick: () => void }) {
+function ProjectCard({ project }: { project: Project }) {
+  const navigate = useNavigate();
   const videoRef = useRef<HTMLVideoElement>(null);
   const [videoReady, setVideoReady] = useState(false);
   const [hovered, setHovered] = useState(false);
@@ -78,7 +79,7 @@ function ProjectCard({ project, onClick }: { project: Project; onClick: () => vo
 
   return (
     <article
-      onClick={onClick}
+      onClick={() => navigate({ to: "/projects/$id", params: { id: project.id } })}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
       className="group cursor-pointer rounded-2xl border border-border bg-card shadow-soft transition-all duration-300 hover:-translate-y-1 hover:shadow-elegant overflow-hidden"
@@ -89,7 +90,7 @@ function ProjectCard({ project, onClick }: { project: Project; onClick: () => vo
           <img
             src={project.thumbnail_url}
             alt={project.title}
-            className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-500 ${
+            className={`absolute inset-0 h-full w-full object-cover object-center transition-opacity duration-500 ${
               hovered && (isYouTube || videoReady) && project.video_url ? "opacity-0" : "opacity-100"
             }`}
           />
@@ -167,111 +168,10 @@ function ProjectCard({ project, onClick }: { project: Project; onClick: () => vo
   );
 }
 
-// ─── Project Modal ─────────────────────────────────────────────────────────────
-function ProjectModal({ project, onClose }: { project: Project; onClose: () => void }) {
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
-    document.addEventListener("keydown", handler);
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.removeEventListener("keydown", handler);
-      document.body.style.overflow = "";
-    };
-  }, [onClose]);
-
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 md:p-8 bg-foreground/60 backdrop-blur-sm"
-      onClick={(e) => e.target === e.currentTarget && onClose()}
-    >
-      <div className="relative flex w-full max-w-4xl flex-col rounded-2xl border border-border bg-card shadow-elegant overflow-hidden max-h-[90vh]">
-        <button
-          onClick={onClose}
-          aria-label="Close"
-          className="absolute right-4 top-4 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-background/80 backdrop-blur-sm border border-border hover:bg-accent transition-colors"
-        >
-          <X className="h-4 w-4" />
-        </button>
-
-        {/* Media */}
-        <div className="relative aspect-video w-full shrink-0 bg-muted overflow-hidden">
-          {project.thumbnail_url && !project.video_url && (
-            <img
-              src={project.thumbnail_url}
-              alt={project.title}
-              className="absolute inset-0 h-full w-full object-cover"
-            />
-          )}
-          {project.video_url && (() => {
-            const isYT = !!getYouTubeId(project.video_url);
-            return isYT ? (
-              <iframe
-                src={getYouTubeEmbedUrl(project.video_url, true)}
-                allow="autoplay; encrypted-media; fullscreen"
-                allowFullScreen
-                className="absolute inset-0 h-full w-full"
-              />
-            ) : (
-              <video
-                src={project.video_url}
-                autoPlay
-                muted
-                loop
-                playsInline
-                controls
-                poster={project.thumbnail_url ?? undefined}
-                className="absolute inset-0 h-full w-full object-cover"
-              />
-            );
-          })()}
-          {!project.thumbnail_url && !project.video_url && (
-            <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-primary/10 to-primary-glow/10">
-              <span className="text-6xl font-bold tracking-tight text-primary/20 select-none">
-                {project.title.slice(0, 2).toUpperCase()}
-              </span>
-            </div>
-          )}
-        </div>
-
-        {/* Details */}
-        <div className="overflow-y-auto p-6 md:p-8">
-          <h2 className="text-2xl font-bold tracking-tight">{project.title}</h2>
-          <p className="mt-3 text-base leading-relaxed text-muted-foreground">{project.description}</p>
-
-          <div className="mt-5">
-            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Tech Stack</p>
-            <div className="flex flex-wrap gap-2">
-              {project.tech_stack.map((t) => (
-                <span key={t} className="rounded-lg border border-border bg-accent px-3 py-1 text-sm font-medium text-accent-foreground">
-                  {t}
-                </span>
-              ))}
-            </div>
-          </div>
-
-          {project.demo_url && (
-            <div className="mt-6">
-              <a
-                href={project.demo_url}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-soft hover:shadow-elegant transition-shadow"
-              >
-                View live demo <ExternalLink className="h-4 w-4" />
-              </a>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // ─── Page ──────────────────────────────────────────────────────────────────────
 function ProjectsPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selected, setSelected] = useState<Project | null>(null);
 
   useEffect(() => {
     void (async () => {
@@ -318,13 +218,11 @@ function ProjectsPage() {
         ) : (
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {projects.map((p) => (
-              <ProjectCard key={p.id} project={p} onClick={() => setSelected(p)} />
+              <ProjectCard key={p.id} project={p} />
             ))}
           </div>
         )}
       </section>
-
-      {selected && <ProjectModal project={selected} onClose={() => setSelected(null)} />}
     </SiteLayout>
   );
 }
