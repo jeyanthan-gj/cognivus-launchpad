@@ -1,4 +1,3 @@
-// build: 1778547053
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { ArrowLeft, ExternalLink } from "lucide-react";
@@ -19,7 +18,6 @@ type Project = {
   video_url: string | null;
 };
 
-// ─── YouTube helpers ───────────────────────────────────────────────────────────
 function getYouTubeId(url: string): string | null {
   const match = url.match(
     /(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/
@@ -40,6 +38,27 @@ function getYouTubeEmbedUrl(url: string, autoplay = false): string {
     modestbranding: "1",
   });
   return `https://www.youtube.com/embed/${id}?${params.toString()}`;
+}
+
+// Strip hashtags, emojis, URLs, and excessive whitespace from description
+function cleanDescription(raw: string): string {
+  return raw
+    .split("\n")
+    .map((line) => line.trim())
+    // Remove lines that are mostly hashtags
+    .filter((line) => !line.match(/^(#\w+\s*){2,}$/))
+    // Remove lines that are URLs
+    .filter((line) => !line.match(/^https?:\/\//))
+    // Remove lines with "Like, Subscribe" type social CTAs
+    .filter((line) => !/like|subscribe|share|follow/i.test(line) || line.length > 80)
+    .join("\n")
+    // Strip inline hashtags
+    .replace(/#\w+/g, "")
+    // Strip emojis
+    .replace(/[\u{1F300}-\u{1FFFF}]|[\u{2600}-\u{27BF}]/gu, "")
+    // Collapse multiple blank lines
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }
 
 function ProjectDetailPage() {
@@ -69,7 +88,6 @@ function ProjectDetailPage() {
           <div className="aspect-video w-full rounded-2xl bg-muted" />
           <div className="h-8 w-2/3 rounded bg-muted" />
           <div className="h-4 w-full rounded bg-muted" />
-          <div className="h-4 w-4/5 rounded bg-muted" />
         </div>
       </SiteLayout>
     );
@@ -92,10 +110,12 @@ function ProjectDetailPage() {
   }
 
   const isYouTube = !!project.video_url && !!getYouTubeId(project.video_url);
+  const description = cleanDescription(project.description);
 
   return (
     <SiteLayout>
       <div className="mx-auto max-w-4xl px-6 py-12 md:py-20">
+
         {/* Back */}
         <button
           onClick={() => router.history.back()}
@@ -103,6 +123,11 @@ function ProjectDetailPage() {
         >
           <ArrowLeft className="h-4 w-4" /> Back to projects
         </button>
+
+        {/* Title */}
+        <h1 className="text-3xl font-bold tracking-tight md:text-4xl mb-6">
+          {project.title}
+        </h1>
 
         {/* Media */}
         <div className="relative aspect-video w-full overflow-hidden rounded-2xl border border-border bg-muted shadow-elegant">
@@ -130,7 +155,7 @@ function ProjectDetailPage() {
             <img
               src={project.thumbnail_url}
               alt={project.title}
-              className="absolute inset-0 h-full w-full object-contain"
+              className="absolute inset-0 h-full w-full object-cover object-center"
             />
           ) : (
             <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-primary/10 to-primary-glow/10">
@@ -141,11 +166,12 @@ function ProjectDetailPage() {
           )}
         </div>
 
-        {/* Title & description */}
-        <div className="mt-10">
-          <h1 className="text-3xl font-bold tracking-tight md:text-4xl">{project.title}</h1>
-          <p className="mt-4 text-lg leading-relaxed text-muted-foreground">{project.description}</p>
-        </div>
+        {/* Description */}
+        {description && (
+          <p className="mt-8 text-base leading-relaxed text-muted-foreground whitespace-pre-line">
+            {description}
+          </p>
+        )}
 
         {/* Tech stack */}
         {project.tech_stack.length > 0 && (
@@ -179,8 +205,8 @@ function ProjectDetailPage() {
             </a>
           </div>
         )}
+
       </div>
     </SiteLayout>
   );
 }
-
