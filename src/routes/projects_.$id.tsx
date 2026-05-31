@@ -1,10 +1,11 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { ArrowLeft, ExternalLink } from "lucide-react";
+import ReactMarkdown from "react-markdown";
 import { SiteLayout } from "@/components/site/SiteLayout";
 import { supabase } from "@/integrations/supabase/client";
 
-export const Route = createFileRoute("/projects/$id")({
+export const Route = createFileRoute("/projects_/$id")({
   component: ProjectDetailPage,
 });
 
@@ -168,9 +169,14 @@ function ProjectDetailPage() {
 
         {/* Description */}
         {description && (
-          <p className="mt-8 text-base leading-relaxed text-muted-foreground whitespace-pre-line">
-            {description}
-          </p>
+          <div className="mt-8 prose prose-neutral dark:prose-invert max-w-none text-muted-foreground
+            prose-headings:text-foreground prose-headings:font-semibold
+            prose-h3:text-xl prose-h4:text-base
+            prose-strong:text-foreground
+            prose-li:marker:text-primary
+            prose-a:text-primary prose-a:no-underline hover:prose-a:underline">
+            <ReactMarkdown>{description}</ReactMarkdown>
+          </div>
         )}
 
         {/* Tech stack */}
