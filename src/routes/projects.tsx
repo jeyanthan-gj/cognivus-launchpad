@@ -91,7 +91,7 @@ function ProjectCard({ project }: { project: Project }) {
           <img
             src={project.thumbnail_url}
             alt={project.title}
-            className={`absolute inset-0 h-full w-full object-cover object-center transition-opacity duration-500 ${
+            className={`absolute inset-0 h-full w-full object-contain object-center transition-opacity duration-500 ${
               hovered && (isYouTube || videoReady) && project.video_url ? "opacity-0" : "opacity-100"
             }`}
           />
