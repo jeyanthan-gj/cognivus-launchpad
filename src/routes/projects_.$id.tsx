@@ -167,6 +167,20 @@ function ProjectDetailPage() {
           )}
         </div>
 
+        {/* Demo link */}
+        {project.demo_url && (
+          <div className="mt-6">
+            <a
+              href={project.demo_url}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-2 rounded-lg bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground shadow-soft hover:shadow-elegant transition-shadow"
+            >
+              View live demo <ExternalLink className="h-4 w-4" />
+            </a>
+          </div>
+        )}
+
         {/* Description */}
         {description && (
           <div className="mt-8 prose prose-neutral dark:prose-invert max-w-none text-muted-foreground
@@ -195,20 +209,6 @@ function ProjectDetailPage() {
                 </span>
               ))}
             </div>
-          </div>
-        )}
-
-        {/* Demo link */}
-        {project.demo_url && (
-          <div className="mt-10">
-            <a
-              href={project.demo_url}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-2 rounded-lg bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground shadow-soft hover:shadow-elegant transition-shadow"
-            >
-              View live demo <ExternalLink className="h-4 w-4" />
-            </a>
           </div>
         )}
 
